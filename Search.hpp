@@ -41,7 +41,13 @@ boost::optional< std::list< STATE > > breadth_first_search( const STATE & inital
 	}
 	return boost::optional< std::list< STATE > >( );
 }
-enum location { Sibiu, Fagaras, Bucharest, Pitesti, Rimnicu_Vilcea };
+enum location
+{
+	Sibiu, Fagaras, Bucharest, Pitesti, Rimnicu_Vilcea,
+	Oradea, Zerind, Arad, Timisoara, Lugoj,
+	Mehadia, Drobeta, Craivoa, Giurgiu, Urziceni,
+	Hirsova, Eforie, Vaslui, Iasi, Neamt
+};
 
 const std::multimap< location, std::pair< location, size_t > > map( )
 {
@@ -58,8 +64,26 @@ const std::multimap< location, std::pair< location, size_t > > map( )
 		add_edge( Pitesti, Bucharest, 101 );
 		add_edge( Bucharest, Fagaras, 211 );
 		add_edge( Fagaras, Sibiu, 99 );
+		add_edge( Oradea, Zerind, 71 );
+		add_edge( Zerind, Arad, 75 );
+		add_edge( Arad, Timisoara, 118 );
+		add_edge( Oradea, Sibiu, 151 );
+		add_edge( Arad, Sibiu, 140 );
+		add_edge( Timisoara, Lugoj, 111 );
+		add_edge( Lugoj, Mehadia, 70 );
+		add_edge( Mehadia, Drobeta, 75 );
+		add_edge( Drobeta, Craivoa, 120 );
+		add_edge( Craivoa, Rimnicu_Vilcea, 146 );
+		add_edge( Craivoa, Pitesti, 138 );
+		add_edge( Bucharest, Giurgiu, 90 );
+		add_edge( Bucharest, Urziceni, 85 );
+		add_edge( Urziceni, Hirsova, 98 );
+		add_edge( Hirsova, Eforie, 86 );
+		add_edge( Urziceni, Vaslui, 142 );
+		add_edge( Vaslui, Iasi, 92 );
+		add_edge( Iasi, Neamt, 87 );
 		return ret;
-	}() );
+	}( ) );
 	return ret;
 }
 BOOST_TEST_DONT_PRINT_LOG_VALUE( std::list< location > );
@@ -279,6 +303,62 @@ BOOST_AUTO_TEST_CASE( IDDFS )
 				   it );
 	},
 				 [](location l){ return l == Bucharest; } );
+	BOOST_CHECK_EQUAL( res, std::list< location >( { Fagaras, Bucharest } ) );
+}
+
+template< typename STATE, typename FORWARD, typename BACKWARD >
+boost::optional< std::list< STATE > > biderectional_breadth_first_search( const STATE & inital_state,
+															const STATE & final_state,
+															const FORWARD & f1,
+															const BACKWARD & f2 )
+{
+	std::list< std::pair< STATE, std::list< STATE > > >
+			forward( { { inital_state, std::list< STATE >( ) } } ),
+			backward( { { final_state, std::list< STATE >( ) } } );
+	std::map< STATE, std::list< STATE > >
+			forward_expanded( { { inital_state, std::list< STATE >( ) } } ),
+			backward_expanded( { { final_state, std::list< STATE >( ) } } );
+	bool do_forward = true;
+	auto expand = [&]( const STATE & s, auto it )
+	{
+		if ( do_forward ) { f1( s, it ); }
+		else { f2( s, it ); }
+	};
+	while ( ( ! forward.empty( ) ) || ( ! backward.empty( ) ) )
+	{
+		auto & current_map = do_forward ? forward : backward;
+		auto & detect_map = do_forward ? backward_expanded : forward_expanded;
+		const auto & current_state = current_map.front( );
+		if ( detect_map.count( current_state.first ) != 0 ) { return current_state.second; }
+		expand( current_state.first,
+				boost::make_function_output_iterator( [&](const STATE & s)
+		{
+			current_map.push_back( { s,
+									   [&]( )
+									   {
+										   auto ret = current_state.second;
+										   ret.push_back(s);
+										   return ret;
+									   }( )
+									} );
+		} ) );
+		current_map.pop_front( );
+		do_forward = ! do_forward;
+	}
+	return boost::optional< std::list< STATE > >( );
+}
+
+BOOST_AUTO_TEST_CASE( BBFS )
+{
+	auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp ){ return pp.second.first; };
+	auto expand = [&](location l, const auto & it)
+	{
+		auto tem = map( ).equal_range( l );
+		std::copy( boost::make_transform_iterator( tem.first, sf ),
+				   boost::make_transform_iterator( tem.second, sf ),
+				   it );
+	};
+	auto res = biderectional_breadth_first_search( Sibiu, Bucharest, expand, expand );
 	BOOST_CHECK_EQUAL( res, std::list< location >( { Fagaras, Bucharest } ) );
 }
 
