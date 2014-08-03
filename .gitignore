@@ -1,7 +1,6 @@
-<<<<<<< HEAD
+
 *.pro.user
 main.cpp
-=======
 # Compiled Object files
 *.slo
 *.lo
@@ -23,4 +22,3 @@ main.cpp
 *.exe
 *.out
 *.app
->>>>>>> e49ed34249b0d7813b2447093c6781c6e3c3f76f
