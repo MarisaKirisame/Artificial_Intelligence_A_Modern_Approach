@@ -314,7 +314,7 @@ boost::optional< std::list< STATE > > biderectional_breadth_first_search( const 
 {
 	std::list< std::pair< STATE, std::list< STATE > > >
 			forward( { { inital_state, std::list< STATE >( ) } } ),
-			backward( { { final_state, std::list< STATE >( ) } } );
+			backward( { { final_state, std::list< STATE >( { final_state } ) } } );
 	std::map< STATE, std::list< STATE > >
 			forward_expanded( { { inital_state, std::list< STATE >( ) } } ),
 			backward_expanded( { { final_state, std::list< STATE >( ) } } );
@@ -328,8 +328,15 @@ boost::optional< std::list< STATE > > biderectional_breadth_first_search( const 
 	{
 		auto & current_map = do_forward ? forward : backward;
 		auto & detect_map = do_forward ? backward_expanded : forward_expanded;
-		const auto & current_state = current_map.front( );
-		if ( detect_map.count( current_state.first ) != 0 ) { return current_state.second; }
+		auto & expand_map = do_forward ? forward_expanded : backward_expanded;
+		auto & current_state = current_map.front( );
+		if ( detect_map.count( current_state.first ) != 0 )
+		{
+			current_state.second.pop_back( );
+			( do_forward ? detect_map.find( current_state.first )->second : current_state.second ).reverse( );
+			current_state.second.splice( current_state.second.end( ), detect_map.find( current_state.first )->second );
+			return current_state.second;
+		}
 		expand( current_state.first,
 				boost::make_function_output_iterator( [&](const STATE & s)
 		{
@@ -342,6 +349,7 @@ boost::optional< std::list< STATE > > biderectional_breadth_first_search( const 
 									   }( )
 									} );
 		} ) );
+		expand_map.insert( current_state );
 		current_map.pop_front( );
 		do_forward = ! do_forward;
 	}
@@ -351,15 +359,15 @@ boost::optional< std::list< STATE > > biderectional_breadth_first_search( const 
 BOOST_AUTO_TEST_CASE( BBFS )
 {
 	auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp ){ return pp.second.first; };
-	auto expand = [&](location l, const auto & it)
+	auto expand = [&]( location l, const auto & it )
 	{
 		auto tem = map( ).equal_range( l );
 		std::copy( boost::make_transform_iterator( tem.first, sf ),
 				   boost::make_transform_iterator( tem.second, sf ),
 				   it );
 	};
-	auto res = biderectional_breadth_first_search( Sibiu, Bucharest, expand, expand );
-	BOOST_CHECK_EQUAL( res, std::list< location >( { Fagaras, Bucharest } ) );
+	auto res = biderectional_breadth_first_search( Lugoj, Fagaras, expand, expand );
+	BOOST_CHECK_EQUAL( res, std::list< location >( { Timisoara, Arad, Sibiu, Fagaras } ) );
 }
 
 #endif // SEARCH_HPP
