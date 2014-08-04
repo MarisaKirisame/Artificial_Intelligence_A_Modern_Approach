@@ -288,20 +288,20 @@ OUTITER depth_first_search( const STATE & inital_state,
 	f1( inital_state, std::back_inserter( vec ) );
 	for ( const STATE & s : vec )
 	{
-		bool founded = false;
+		bool find_solution = false;
 		depth_first_search( s, f1, f2, new_depth,
 							boost::make_function_output_iterator( std::function< void( const STATE & ) >( [&]( const auto & state )
 		{
-			if ( ! founded )
+			if ( ! find_solution )
 			{
 				* result = inital_state;
 				++result;
-				founded = true;
+				find_solution = true;
 			}
 			* result = state;
 			++result;
 		} ) ) );
-		if ( founded ) { return result; }
+		if ( find_solution ) { return result; }
 	}
 	return result;
 }
