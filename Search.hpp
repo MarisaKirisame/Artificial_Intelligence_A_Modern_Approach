@@ -109,59 +109,78 @@ BOOST_AUTO_TEST_CASE( BFS_TEST )
 
 template< typename STATE, typename COST, typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename OUTITER >
 OUTITER uniform_cost_search( const STATE & inital_state,
-																			  const COST & inital_cost,
-																			  EXPAND f1,
-																			  RETURN_IF f2,
-																			  COST_OUTPUT f3,
-																			  OUTITER result )
+							 const COST & inital_cost,
+							 EXPAND f1,
+							 RETURN_IF f2,
+							 COST_OUTPUT f3,
+							 OUTITER result )
+{ return best_first_search( inital_state, inital_cost, f1, f2, [](const STATE &, const COST  & s){return s;}, f3, result ); }
+
+template< typename STATE, typename COST, typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename EVAL_FUNC, typename OUTITER >
+OUTITER best_first_search( const STATE & inital_state,
+						   const COST & inital_cost,
+						   EXPAND f1,
+						   RETURN_IF f2,
+						   EVAL_FUNC f3,
+						   COST_OUTPUT f4,
+						   OUTITER result )
 {
 	struct state_tag { };
-	struct cost_tag { };
+	struct eval_tag { };
 	using namespace boost;
 	using namespace multi_index;
+	typedef decltype( f3( std::declval< STATE >( ), std::declval< COST >( ) ) ) EVAL;
 	struct element
 	{
 		STATE state;
 		COST cost;
 		std::list< STATE > history;
+		EVAL eval;
+		element( const STATE & state, const COST & cost, const std::list< STATE > history, const EVAL & eval ) :
+			state( state ), cost( cost ), history( history ), eval( eval ) { }
 	};
+	auto make_element = [&]( const STATE & state, const COST & cost, const std::list< STATE > &  history )
+	{ return element( state, cost, history, f3( state, cost ) ); };
+	auto update_element = [&]( element & e ){ e.eval = f3( e.state, e.cost ); };
 	multi_index_container
 	<
 		element,
 		indexed_by
 		<
 			ordered_unique< tag< state_tag >, member< element, STATE, & element::state > >,
-			ordered_non_unique< tag< cost_tag >, member< element, COST, & element::cost > >
+			ordered_non_unique< tag< eval_tag >, member< element, EVAL, & element::eval > >
 		>
-	> container( { { inital_state, inital_cost, { inital_state } } } );
-	auto & cost_index = container.get< cost_tag >( );
+	> container( { make_element( inital_state, inital_cost, { inital_state } ) } );
+	auto & goodness_index = container.get< eval_tag >( );
 	auto & state_index = container.get< state_tag >( );
 	while ( ! container.empty( ) )
 	{
-		auto iterator = cost_index.begin( );
+		auto iterator = goodness_index.begin( );
 		const element & current_element = * iterator;
 		if ( f2( current_element.state ) )
 		{
-			f3( current_element.cost );
+			f4( current_element.cost );
 			return std::copy( current_element.history.begin( ), current_element.history.end( ), result );
 		}
 		f1( current_element.state, boost::make_function_output_iterator( [&]( const std::pair< STATE, COST > & e )
 		{
+			if ( std::count( current_element.history.begin( ), current_element.history.end( ), e.first ) != 0 ) { return; }
 			auto it = state_index.find( e.first );
 			COST cost = e.second + current_element.cost;
 			std::list< STATE > history = current_element.history;
 			history.push_back( e.first );
-			if ( it == state_index.end( ) ) { state_index.insert( element( { e.first, cost, std::move( history ) } ) ); }
+			if ( it == state_index.end( ) ) { state_index.insert( make_element( e.first, cost, std::move( history ) ) ); }
 			else { state_index.modify( it, [&]( element & ee )
 			{
 				if ( ee.cost > cost )
 				{
 					ee.cost = cost;
 					ee.history = std::move( history );
+					update_element( ee );
 				}
 			} ); }
 		} ) );
-		cost_index.erase( iterator );
+		goodness_index.erase( iterator );
 	}
 	return result;
 }
@@ -379,12 +398,12 @@ OUTITER biderectional_breadth_first_search( const STATE & inital_state,
 				boost::make_function_output_iterator( [&](const STATE & s)
 		{
 			current_map.push_back( { s,
-									   [&]( )
-									   {
-										   auto ret = current_state.second;
-										   ret.push_back(s);
-										   return ret;
-									   }( )
+										[&]( )
+										{
+											auto ret = current_state.second;
+											ret.push_back(s);
+											return ret;
+										}( )
 									} );
 		} ) );
 		expand_map.insert( current_state );
