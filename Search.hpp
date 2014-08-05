@@ -21,27 +21,22 @@
 template< typename STATE, typename EXPAND, typename RETURN_IF, typename OUTITER >
 OUTITER breadth_first_search( const STATE & inital_state, EXPAND f1, RETURN_IF f2, OUTITER result )
 {
-	std::list< std::pair< STATE, std::list< STATE > > > in_search( { { inital_state, std::list< STATE >( { inital_state } ) } } );
-	while ( ! in_search.empty( ) )
-	{
-		const auto & current_state = in_search.front( );
-		if ( f2( current_state.first ) )
-		{ return std::copy( current_state.second.begin( ), current_state.second.end( ), result ); }
-		f1( current_state.first,
-			boost::make_function_output_iterator( [&]( const STATE & s )
-		{
-			in_search.push_back( { s,
-								   [&]( )
-								   {
-									   auto ret = current_state.second;
-									   ret.push_back(s);
-									   return ret;
-								   }( )
-								 } );
-		} ) );
-		in_search.pop_front( );
-	}
-	return result;
+	size_t inital_depth = 0;
+	return uniform_cost_search( inital_state,
+								inital_depth,
+								[&]( const STATE & s, auto it )
+								{
+									f1( s,
+									boost::make_function_output_iterator(
+											[&]( const STATE & s )
+											{
+												*it = std::make_pair(s,1);
+												++it;
+											} ) );
+								},
+								f2,
+								[](size_t){},
+								result );
 }
 
 enum location
@@ -94,36 +89,39 @@ BOOST_AUTO_TEST_CASE( BFS_TEST )
 {
 	auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp ){ return pp.second.first; };
 	std::list< location > res;
-	breadth_first_search( Sibiu,
-						  [&](location l, const auto & it)
-	{
-		auto tem = map( ).equal_range( l );
-		std::copy( boost::make_transform_iterator( tem.first, sf ),
-				   boost::make_transform_iterator( tem.second, sf ),
-				   it );
-	},
-						  [](location l){ return l == Bucharest; },
-						  std::back_inserter( res ) );
+	breadth_first_search(
+						Sibiu,
+						[&](location l, const auto & it)
+						{
+							auto tem = map( ).equal_range( l );
+							std::copy( boost::make_transform_iterator( tem.first, sf ),
+							boost::make_transform_iterator( tem.second, sf ),
+							it );
+						},
+						[](location l){ return l == Bucharest; },
+						std::back_inserter( res ) );
 	BOOST_CHECK_EQUAL( res, std::list< location >( { Sibiu, Fagaras, Bucharest } ) );
 }
 
 template< typename STATE, typename COST, typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename OUTITER >
-OUTITER uniform_cost_search( const STATE & inital_state,
-							 const COST & inital_cost,
-							 EXPAND f1,
-							 RETURN_IF f2,
-							 COST_OUTPUT f3,
-							 OUTITER result )
+OUTITER uniform_cost_search(
+		const STATE & inital_state,
+		const COST & inital_cost,
+		EXPAND f1,
+		RETURN_IF f2,
+		COST_OUTPUT f3,
+		OUTITER result )
 { return best_first_search( inital_state, inital_cost, f1, f2, [](const STATE &, const COST  & s){return s;}, f3, result ); }
 
 template< typename STATE, typename COST, typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename EVAL_FUNC, typename OUTITER >
-OUTITER best_first_search( const STATE & inital_state,
-						   const COST & inital_cost,
-						   EXPAND f1,
-						   RETURN_IF f2,
-						   EVAL_FUNC f3,
-						   COST_OUTPUT f4,
-						   OUTITER result )
+OUTITER best_first_search(
+		const STATE & inital_state,
+		const COST & inital_cost,
+		EXPAND f1,
+		RETURN_IF f2,
+		EVAL_FUNC f3,
+		COST_OUTPUT f4,
+		OUTITER result )
 {
 	struct state_tag { };
 	struct eval_tag { };
@@ -189,16 +187,17 @@ BOOST_AUTO_TEST_CASE( UCS_TEST )
 {
 	auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp ){ return pp.second; };
 	std::list< location > res;
-	uniform_cost_search( Sibiu,
-						 0,
-						 [&]( location l, auto it )
-	{
-		auto tem = map( ).equal_range( l );
-		std::copy( boost::make_transform_iterator( tem.first, sf ), boost::make_transform_iterator( tem.second, sf ), it );
-	},
-						 [](location l){ return l == Bucharest; },
-						 []( auto cost ){ BOOST_CHECK_EQUAL( cost, 278 ); },
-						 std::back_inserter( res ) );
+	uniform_cost_search(
+				Sibiu,
+				0,
+				[&]( location l, auto it )
+				{
+					auto tem = map( ).equal_range( l );
+					std::copy( boost::make_transform_iterator( tem.first, sf ), boost::make_transform_iterator( tem.second, sf ), it );
+				},
+				[](location l){ return l == Bucharest; },
+				[]( auto cost ){ BOOST_CHECK_EQUAL( cost, 278 ); },
+				std::back_inserter( res ) );
 	BOOST_CHECK_EQUAL( res, std::list< location >( { Sibiu, Rimnicu_Vilcea, Pitesti, Bucharest } ) );
 }
 
@@ -261,20 +260,20 @@ struct postive_infinity
 };
 
 template< typename STATE, typename EXPAND, typename RETURN_IF, typename OUTITER >
-OUTITER depth_first_search( const STATE & inital_state,
-							EXPAND f1,
-							RETURN_IF f2,
-							OUTITER result )
-{
-	return depth_first_search( inital_state, f1, f2, postive_infinity( ), result );
-}
+OUTITER depth_first_search(
+		const STATE & inital_state,
+		EXPAND f1,
+		RETURN_IF f2,
+		OUTITER result )
+{ return depth_first_search( inital_state, f1, f2, postive_infinity( ), result ); }
 
 template< typename STATE, typename EXPAND, typename RETURN_IF, typename NUM, typename OUTITER >
-OUTITER depth_first_search( const STATE & inital_state,
-							EXPAND f1,
-							RETURN_IF f2,
-							const NUM & depth,
-							OUTITER result )
+OUTITER depth_first_search(
+		const STATE & inital_state,
+		EXPAND f1,
+		RETURN_IF f2,
+		const NUM & depth,
+		OUTITER result )
 {
 	if ( f2( inital_state ) )
 	{
@@ -353,9 +352,10 @@ BOOST_AUTO_TEST_CASE( IDDFS )
 											[&](location l, const auto & it)
 	{
 		auto tem = map( ).equal_range( l );
-		std::copy( boost::make_transform_iterator( tem.first, sf ),
-				   boost::make_transform_iterator( tem.second, sf ),
-				   it );
+		std::copy(
+					boost::make_transform_iterator( tem.first, sf ),
+					boost::make_transform_iterator( tem.second, sf ),
+					it );
 	},
 											[](location l){ return l == Bucharest; },
 											std::back_inserter( res ) );
@@ -376,11 +376,12 @@ OUTITER biderectional_breadth_first_search( const STATE & inital_state,
 			forward_expanded( { { inital_state, std::list< STATE >( ) } } ),
 			backward_expanded( { { final_state, std::list< STATE >( ) } } );
 	bool do_forward = true;
-	auto expand = [&]( const STATE & s, auto it )
-	{
-		if ( do_forward ) { f1( s, it ); }
-		else { f2( s, it ); }
-	};
+	auto expand =
+			[&]( const STATE & s, auto it )
+			{
+				if ( do_forward ) { f1( s, it ); }
+				else { f2( s, it ); }
+			};
 	while ( ( ! forward.empty( ) ) || ( ! backward.empty( ) ) )
 	{
 		auto & current_map = do_forward ? forward : backward;
