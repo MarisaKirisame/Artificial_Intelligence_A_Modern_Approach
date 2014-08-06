@@ -183,6 +183,112 @@ OUTITER best_first_search(
 	return result;
 }
 
+template
+<
+	typename STATE, typename COST, typename EVAL,
+	typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename SEARCH_EVAL_OUTPUT, typename EVAL_FUNC, typename OUTITER
+>
+
+OUTITER recursive_best_first_search(
+		const STATE & inital_state,
+		const COST & inital_cost,
+		const boost::optional< EVAL > & init_eval,
+		const EVAL & eval_limit,
+		EXPAND f1,
+		RETURN_IF f2,
+		EVAL_FUNC f3,
+		COST_OUTPUT f4,
+		SEARCH_EVAL_OUTPUT f5,
+		OUTITER result )
+{
+	if ( f2( inital_state ) )
+	{
+		f4( inital_cost );
+		* result = inital_state;
+		++result;
+		return result;
+	}
+	struct state_tag { };
+	struct eval_tag { };
+	using namespace boost;
+	using namespace multi_index;
+	struct element
+	{
+		STATE state;
+		COST cost;
+		EVAL eval;
+		element( const STATE & state, const COST & cost, const EVAL & eval ) :
+			state( state ), cost( cost ), eval( eval ) { }
+	};
+	auto make_element = [&]( const STATE & state, const COST & cost )
+	{ return element( state, cost, init_eval ? std::max( f3( state, cost ), * init_eval ) : f3( state, cost ) ); };
+	multi_index_container
+	<
+		element,
+		indexed_by
+		<
+			ordered_unique< tag< state_tag >, member< element, STATE, & element::state > >,
+			ordered_non_unique< tag< eval_tag >, member< element, EVAL, & element::eval > >
+		>
+	> container;
+	auto & goodness_index = container.get< eval_tag >( );
+	auto & state_index = container.get< state_tag >( );
+	f1(
+				inital_state,
+				boost::make_function_output_iterator(
+					[&]( const std::pair< STATE, COST > & p )
+	{ container.insert( make_element( p.first, p.second + inital_cost ) ); } ) );
+	if ( container.empty( ) ) { return result; }
+	else if ( container.size( ) == 1 )
+	{
+		return recursive_best_first_search(
+					container.begin( )->state,
+					inital_cost + container.begin( )->cost,
+					init_eval,
+					eval_limit,
+					f1,
+					f2,
+					f3,
+					f4,
+					f5,
+					result );
+	}
+	while ( true )
+	{
+		auto iterator = goodness_index.begin( );
+		const element & current_element = * iterator;
+		++iterator;
+		const element & second_element = * iterator;
+		if ( current_element.eval > eval_limit )
+		{
+			f5( current_element.eval );
+			return result;
+		}
+		if ( f2( current_element.state ) )
+		{
+			f4( current_element.cost );
+			* result = current_element.state;
+			++result;
+			return result;
+		}
+		auto res = recursive_best_first_search( current_element.state,
+												current_element.cost,
+												current_element.eval,
+												std::min( eval_limit, second_element.eval ),
+												f1,
+												f2,
+												f3,
+												f4,
+												[&](const EVAL & e)
+												{
+													goodness_index.modify( goodness_index.begin( ), [&](element & el){ el.eval = e; } );
+													f5( e );
+												},
+												result );
+	}
+	return result;
+}
+
 BOOST_AUTO_TEST_CASE( UCS_TEST )
 {
 	auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp ){ return pp.second; };
@@ -265,14 +371,27 @@ OUTITER depth_first_search(
 		EXPAND f1,
 		RETURN_IF f2,
 		OUTITER result )
-{ return depth_first_search( inital_state, f1, f2, postive_infinity( ), result ); }
+{ return depth_first_search( inital_state, postive_infinity( ), f1, f2, result ); }
 
-template< typename STATE, typename EXPAND, typename RETURN_IF, typename NUM, typename OUTITER >
+template< typename STATE, typename NUM, typename EXPAND, typename RETURN_IF, typename OUTITER >
 OUTITER depth_first_search(
 		const STATE & inital_state,
+		const NUM & depth,
 		EXPAND f1,
 		RETURN_IF f2,
+		OUTITER result )
+{
+	std::set< location > history = { inital_state };
+	return depth_first_search( inital_state, depth, history, f1, f2, result );
+}
+
+template< typename STATE, typename NUM, typename EXPAND, typename RETURN_IF, typename OUTITER >
+OUTITER depth_first_search(
+		const STATE & inital_state,
 		const NUM & depth,
+		std::set< STATE > & history,
+		EXPAND f1,
+		RETURN_IF f2,
 		OUTITER result )
 {
 	if ( f2( inital_state ) )
@@ -287,20 +406,30 @@ OUTITER depth_first_search(
 	f1( inital_state, std::back_inserter( vec ) );
 	for ( const STATE & s : vec )
 	{
+		if ( history.count( s ) != 0 ) { continue; }
+		history.insert( s );
 		bool find_solution = false;
-		depth_first_search( s, f1, f2, new_depth,
-							boost::make_function_output_iterator( std::function< void( const STATE & ) >( [&]( const auto & state )
-		{
-			if ( ! find_solution )
-			{
-				* result = inital_state;
-				++result;
-				find_solution = true;
-			}
-			* result = state;
-			++result;
-		} ) ) );
+		depth_first_search(
+					s,
+					new_depth,
+					history,
+					f1,
+					f2,
+					boost::make_function_output_iterator(
+						std::function< void( const STATE & ) >(
+							[&]( const auto & state )
+							{
+								if ( ! find_solution )
+								{
+									* result = inital_state;
+									++result;
+									find_solution = true;
+								}
+								* result = state;
+								++result;
+							} ) ) );
 		if ( find_solution ) { return result; }
+		history.erase( s );
 	}
 	return result;
 }
@@ -315,12 +444,13 @@ OUTITER iterative_deepening_depth_first_search( const STATE & inital_state,
 	bool break_loop = false;
 	while ( ! break_loop )
 	{
-		depth_first_search( inital_state, f1, f2, i, boost::make_function_output_iterator( [&]( const STATE & s )
-		{
-			break_loop = true;
-			* result = s;
-			++result;
-		} ) );
+		depth_first_search( inital_state, i, f1, f2, boost::make_function_output_iterator(
+								[&]( const STATE & s )
+								{
+									break_loop = true;
+									* result = s;
+									++result;
+								} ) );
 		++i;
 	}
 	return result;
@@ -332,33 +462,35 @@ BOOST_AUTO_TEST_CASE( DFS )
 	std::list< location > res;
 	depth_first_search( Sibiu,
 						[&](location l, const auto & it)
-	{
-		auto tem = map( ).equal_range( l );
-		std::copy( boost::make_transform_iterator( tem.first, sf ),
-				   boost::make_transform_iterator( tem.second, sf ),
-				   it );
-	},
+						{
+							auto tem = map( ).equal_range( l );
+							std::copy(
+										boost::make_transform_iterator( tem.first, sf ),
+										boost::make_transform_iterator( tem.second, sf ),
+										it );
+						},
 						[](location l){ return l == Bucharest; },
-						2,
 						std::back_inserter( res ) );
-	BOOST_CHECK_EQUAL( res, std::list< location >( { Sibiu, Fagaras, Bucharest } ) );
+	BOOST_CHECK_EQUAL( res.front( ), Sibiu );
+	BOOST_CHECK_EQUAL( res.back( ), Bucharest );
 }
 
 BOOST_AUTO_TEST_CASE( IDDFS )
 {
 	auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp ){ return pp.second.first; };
 	std::list< location > res;
-	iterative_deepening_depth_first_search( Sibiu,
-											[&](location l, const auto & it)
-	{
-		auto tem = map( ).equal_range( l );
-		std::copy(
-					boost::make_transform_iterator( tem.first, sf ),
-					boost::make_transform_iterator( tem.second, sf ),
-					it );
-	},
-											[](location l){ return l == Bucharest; },
-											std::back_inserter( res ) );
+	iterative_deepening_depth_first_search(
+				Sibiu,
+				[&](location l, const auto & it)
+				{
+					auto tem = map( ).equal_range( l );
+					std::copy(
+								boost::make_transform_iterator( tem.first, sf ),
+								boost::make_transform_iterator( tem.second, sf ),
+								it );
+				},
+				[](location l){ return l == Bucharest; },
+				std::back_inserter( res ) );
 	BOOST_CHECK_EQUAL( res, std::list< location >( { Sibiu, Fagaras, Bucharest } ) );
 }
 
@@ -428,5 +560,27 @@ BOOST_AUTO_TEST_CASE( BBFS )
 	biderectional_breadth_first_search( Lugoj, Fagaras, expand, expand, std::back_inserter( res ) );
 	BOOST_CHECK_EQUAL( res, std::list< location >( { Lugoj, Timisoara, Arad, Sibiu, Fagaras } ) );
 }
+
+template< typename STATE, typename COST, typename EXPAND, typename EVAL, typename RETURN_IF, typename COST_OUTPUT, typename OUTITER >
+OUTITER greedy_best_first_search(
+		const STATE & inital_state,
+		const COST & inital_cost,
+		EXPAND f1,
+		EVAL f2,
+		RETURN_IF f3,
+		COST_OUTPUT f4,
+		OUTITER result )
+{ return best_first_search( inital_state, inital_cost, f1, f3, [&](const STATE & s, const COST &){return f2(s);}, f4, result ); }
+
+template< typename STATE, typename COST, typename EXPAND, typename EVAL, typename RETURN_IF, typename COST_OUTPUT, typename OUTITER >
+OUTITER A_star(
+		const STATE & inital_state,
+		const COST & inital_cost,
+		EXPAND f1,
+		EVAL f2,
+		RETURN_IF f3,
+		COST_OUTPUT f4,
+		OUTITER result )
+{ return best_first_search( inital_state, inital_cost, f1, f3, [&](const STATE & s, const COST & c){return f2(s) + c;}, f4, result ); }
 
 #endif // SEARCH_HPP
