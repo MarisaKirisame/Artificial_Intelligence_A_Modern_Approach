@@ -656,4 +656,26 @@ OUTITER A_star(
 		OUTITER result )
 { return best_first_search( inital_state, inital_cost, f1, f3, [&](const STATE & s, const COST & c){return f2(s) + c;}, f4, result ); }
 
+template< typename STATE, typename COST, typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename EVAL_FUNC, typename OUTITER >
+OUTITER memory_bounded_best_first_search(
+		const STATE & inital_state,
+		const COST & inital_cost,
+		EXPAND f1,
+		RETURN_IF f2,
+		EVAL_FUNC f3,
+		COST_OUTPUT f4,
+		OUTITER result )
+{
+	using namespace boost;
+	using namespace multi_index;
+	struct element
+	{
+		STATE state;
+		COST cost;
+		std::list< STATE > history;
+		boost::optional< STATE > parent;
+	};
+	//boost::multi_index_container<> container;
+}
+
 #endif // SEARCH_HPP
