@@ -47,7 +47,7 @@ enum location
 	Hirsova, Eforie, Vaslui, Iasi, Neamt
 };
 
-const std::multimap< location, std::pair< location, size_t > > map( )
+const std::multimap< location, std::pair< location, size_t > > & map( )
 {
 	static std::multimap< location, std::pair< location, size_t > > ret( []()
 	{
@@ -111,7 +111,7 @@ OUTITER uniform_cost_search(
 		RETURN_IF f2,
 		COST_OUTPUT f3,
 		OUTITER result )
-{ return best_first_search( inital_state, inital_cost, f1, f2, [](const STATE &, const COST  & s){return s;}, f3, result ); }
+{ return best_first_search( inital_state, inital_cost, f1, f2, [](const STATE &, const COST & s){return s;}, f3, result ); }
 
 template< typename STATE, typename COST, typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename EVAL_FUNC, typename OUTITER >
 OUTITER best_first_search(
@@ -183,17 +183,48 @@ OUTITER best_first_search(
 	return result;
 }
 
+
+template
+<
+	typename STATE, typename COST, typename EVAL,
+	typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename OUTITER
+>
+OUTITER recursive_uniform_cost_search(
+		const STATE & inital_state,
+		const COST & inital_cost,
+		const EVAL & eval_limit,
+		EXPAND f1,
+		RETURN_IF f2,
+		COST_OUTPUT f3,
+		OUTITER result
+		)
+{
+	return recursive_best_first_search(
+				inital_state,
+				inital_cost,
+				boost::optional< EVAL >(),
+				eval_limit,
+				{},
+				f1,
+				f2,
+				[]( const STATE &, const COST & s ){ return s; },
+				f3,
+				[]( const EVAL & ){},
+				result
+				);
+}
+
 template
 <
 	typename STATE, typename COST, typename EVAL,
 	typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename SEARCH_EVAL_OUTPUT, typename EVAL_FUNC, typename OUTITER
 >
-
 OUTITER recursive_best_first_search(
 		const STATE & inital_state,
 		const COST & inital_cost,
 		const boost::optional< EVAL > & init_eval,
 		const EVAL & eval_limit,
+		const std::set< STATE > & search_before,
 		EXPAND f1,
 		RETURN_IF f2,
 		EVAL_FUNC f3,
@@ -201,6 +232,12 @@ OUTITER recursive_best_first_search(
 		SEARCH_EVAL_OUTPUT f5,
 		OUTITER result )
 {
+	EVAL inital_eval( f3( inital_state, inital_cost ) );
+	if ( inital_eval > eval_limit )
+	{
+		f5( inital_eval );
+		return result;
+	}
 	if ( f2( inital_state ) )
 	{
 		f4( inital_cost );
@@ -208,6 +245,8 @@ OUTITER recursive_best_first_search(
 		++result;
 		return result;
 	}
+	std::set< STATE > param = search_before;
+	param.insert( inital_state );
 	struct state_tag { };
 	struct eval_tag { };
 	using namespace boost;
@@ -232,26 +271,46 @@ OUTITER recursive_best_first_search(
 		>
 	> container;
 	auto & goodness_index = container.get< eval_tag >( );
-	auto & state_index = container.get< state_tag >( );
 	f1(
 				inital_state,
 				boost::make_function_output_iterator(
 					[&]( const std::pair< STATE, COST > & p )
-	{ container.insert( make_element( p.first, p.second + inital_cost ) ); } ) );
-	if ( container.empty( ) ) { return result; }
+	{
+		if ( search_before.count( p.first ) == 0 ) { container.insert( make_element( p.first, p.second + inital_cost ) ); }
+	} ) );
+	if ( container.empty( ) )
+	{
+		f5( eval_limit * 2 );
+		return result;
+	}
 	else if ( container.size( ) == 1 )
 	{
-		return recursive_best_first_search(
+		bool find_solution = false;
+		recursive_best_first_search(
 					container.begin( )->state,
 					inital_cost + container.begin( )->cost,
-					init_eval,
+					boost::optional< EVAL >( container.begin( )->eval ),
 					eval_limit,
+					param,
 					f1,
 					f2,
 					f3,
 					f4,
 					f5,
-					result );
+					boost::make_function_output_iterator(
+						std::function< void ( const STATE & ) >(
+							[&]( const STATE & s )
+							{
+								if ( ! find_solution )
+								{
+									* result = inital_state;
+									++result;
+									find_solution = true;
+								}
+								* result = s;
+								++ result;
+							} ) ) );
+		return result;
 	}
 	while ( true )
 	{
@@ -264,27 +323,40 @@ OUTITER recursive_best_first_search(
 			f5( current_element.eval );
 			return result;
 		}
-		if ( f2( current_element.state ) )
+		bool find_solution = false;
+		recursive_best_first_search(
+					current_element.state,
+					current_element.cost,
+					boost::optional< EVAL >( current_element.eval ),
+					std::min( eval_limit, second_element.eval ),
+					param,
+					f1,
+					f2,
+					f3,
+					f4,
+					std::function< void ( const EVAL & ) >(
+						[&](const EVAL & e)
+						{
+							goodness_index.modify( goodness_index.begin( ), [&](element & el){ el.eval = e; } );
+							f5( e );
+						} ),
+					boost::make_function_output_iterator(
+				std::function< void ( const STATE & ) >(
+					[&]( const STATE & s )
+					{
+						if ( ! find_solution )
+						{
+							* result = inital_state;
+							++result;
+							find_solution = true;
+						}
+						* result = s;
+						++ result;
+					} ) ) );
+		if ( find_solution )
 		{
-			f4( current_element.cost );
-			* result = current_element.state;
-			++result;
 			return result;
 		}
-		auto res = recursive_best_first_search( current_element.state,
-												current_element.cost,
-												current_element.eval,
-												std::min( eval_limit, second_element.eval ),
-												f1,
-												f2,
-												f3,
-												f4,
-												[&](const EVAL & e)
-												{
-													goodness_index.modify( goodness_index.begin( ), [&](element & el){ el.eval = e; } );
-													f5( e );
-												},
-												result );
 	}
 	return result;
 }
@@ -293,9 +365,10 @@ BOOST_AUTO_TEST_CASE( UCS_TEST )
 {
 	auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp ){ return pp.second; };
 	std::list< location > res;
-	uniform_cost_search(
+	recursive_uniform_cost_search(
 				Sibiu,
 				0,
+				10000,
 				[&]( location l, auto it )
 				{
 					auto tem = map( ).equal_range( l );
