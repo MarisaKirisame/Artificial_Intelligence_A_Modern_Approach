@@ -703,9 +703,29 @@ OUTITER memory_bounded_best_first_search(
 			if ( it->second.cost > c )
 			{
 				it->second.cost = c;
+				it->second.e = f3( s, c );
 				it->second.history = h;
 			}
 		}
+	};
+	auto add_parent = [&]( const element & child )
+	{
+		assert( ! child.history.empty( ) );
+		const STATE & parent = child.history.back( );
+		if ( state_index.count( parent ) == 0 )
+		{
+			std::list< STATE > parent_history = child.history;
+			parent_history.pop_back( );
+			COST reverse_cost;
+			f1( child.state, boost::make_function_output_iterator(
+					[&]( const std::pair< STATE, COST > & p )
+					{
+						if ( p.first == child.state )
+						{ reverse_cost = p.second; }
+					} ) );
+			container.insert( element( parent, child.cost - reverse_cost, child.eval, parent_history ) );
+		}
+		else { state_index.modify( state_index.find( parent ), [&](element & e){ e.eval = std::max( e.eval, child.eval ); } ); }
 	};
 	add_element( inital_state, inital_cost, f3( inital_state, inital_cost ), { } );
 	while ( ! container.empty( ) )
@@ -721,36 +741,21 @@ OUTITER memory_bounded_best_first_search(
 		}
 		std::list< STATE > history = current_element.history;
 		history.push_back( current_element.state );
+		size_t count = 0;
 		f1( current_element.state, boost::make_function_output_iterator(
 				[&]( const std::pair< STATE, COST > & p )
-				{ add_element( p.first, p.second + current_element.cost, std::max( f3( p.first, p.second + current_element.cost, current_element.eval ) ), history ); } ) );
+				{
+					++count;
+					add_element( p.first, p.second + current_element.cost, std::max( f3( p.first, p.second + current_element.cost, current_element.eval ) ), history );
+				} ) );
+		if ( count == 0 ) { add_parent( current_element ); } //avoid empty container situation
+		state_index.erase( current_element );
 		while ( container.size( ) > container_limit )
 		{
 			const auto it = eval_index.rbegin( );
 			const element & remove_element = it->second;
-			if ( remove_element.history.empty( ) ) { eval_index.erase( it ); }
-			else
-			{
-				const STATE & parent = remove_element.history.back( );
-				if ( state_index.count( parent ) == 0 )
-				{
-					std::list< STATE > parent_history = remove_element.history;
-					parent_history.pop_back( );
-					COST reverse_cost;
-					f1( remove_element.state, boost::make_function_output_iterator(
-							[&]( const std::pair< STATE, COST > & p )
-							{
-								if ( p.first == remove_element.state )
-								{ reverse_cost = p.second; }
-							} ) );
-					container.insert( element( parent, remove_element.cost - reverse_cost, remove_element.eval, parent_history ) );
-				}
-				else
-				{
-					state_index.modify( state_index.find( parent ), [&](element & e){ e.eval = std::max( e.eval, remove_element.eval ); } );
-				}
-				eval_index.erase( it );
-			}
+			if ( ! remove_element.history.empty( ) ) { add_parent( remove_element ); }
+			eval_index.erase( it );
 		}
 	}
 	return result;
