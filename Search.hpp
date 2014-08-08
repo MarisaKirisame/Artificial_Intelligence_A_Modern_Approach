@@ -656,26 +656,104 @@ OUTITER A_star(
 		OUTITER result )
 { return best_first_search( inital_state, inital_cost, f1, f3, [&](const STATE & s, const COST & c){return f2(s) + c;}, f4, result ); }
 
-template< typename STATE, typename COST, typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename EVAL_FUNC, typename OUTITER >
+template
+<
+	typename STATE, typename COST,
+	typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename EVAL_FUNC, typename OUTITER
+>
 OUTITER memory_bounded_best_first_search(
 		const STATE & inital_state,
 		const COST & inital_cost,
+		size_t container_limit,
 		EXPAND f1,
 		RETURN_IF f2,
 		EVAL_FUNC f3,
 		COST_OUTPUT f4,
 		OUTITER result )
 {
-	using namespace boost;
-	using namespace multi_index;
+	typedef decltype( f3( std::declval< STATE >( ), std::declval< COST >( ) ) ) EVAL;
 	struct element
 	{
 		STATE state;
 		COST cost;
+		EVAL eval;
 		std::list< STATE > history;
-		boost::optional< STATE > parent;
+		element( const STATE & s, const COST & c, const EVAL & e, const std::list< STATE > & h ) : state( s ), cost( c ), eval( e ), history( h ) { }
 	};
-	//boost::multi_index_container<> container;
+	using namespace boost;
+	using namespace multi_index;
+	struct state_tag { };
+	struct eval_tag { };
+	multi_index_container
+	<
+		element,
+		indexed_by
+		<
+			ordered_unique< tag< state_tag >, member< element, STATE, & element::state > >,
+			ordered_non_unique< tag< eval_tag >, member< element, EVAL, & element::eval > >
+		>
+	> container;
+	auto & state_index = container.get< state_tag >( );
+	auto & eval_index = container.get< eval_tag >( );
+	auto add_element = [&]( const STATE & s, const COST & c, const EVAL & e, const std::list< STATE > & h )
+	{
+		auto it = container.insert( element( s, c, e, h ) );
+		if ( ! it->first )
+		{
+			if ( it->second.cost > c )
+			{
+				it->second.cost = c;
+				it->second.history = h;
+			}
+		}
+	};
+	add_element( inital_state, inital_cost, f3( inital_state, inital_cost ), { } );
+	while ( ! container.empty( ) )
+	{
+		const element & current_element = eval_index.begin( )->second;
+		if ( f2( current_element.state ) )
+		{
+			f4( current_element.cost );
+			auto res = std::copy( current_element.history.begin( ), current_element.history.end( ), result );
+			*res = current_element.state;
+			++res;
+			return res;
+		}
+		std::list< STATE > history = current_element.history;
+		history.push_back( current_element.state );
+		f1( current_element.state, boost::make_function_output_iterator(
+				[&]( const std::pair< STATE, COST > & p )
+				{ add_element( p.first, p.second + current_element.cost, std::max( f3( p.first, p.second + current_element.cost, current_element.eval ) ), history ); } ) );
+		while ( container.size( ) > container_limit )
+		{
+			const auto it = eval_index.rbegin( );
+			const element & remove_element = it->second;
+			if ( remove_element.history.empty( ) ) { eval_index.erase( it ); }
+			else
+			{
+				const STATE & parent = remove_element.history.back( );
+				if ( state_index.count( parent ) == 0 )
+				{
+					std::list< STATE > parent_history = remove_element.history;
+					parent_history.pop_back( );
+					COST reverse_cost;
+					f1( remove_element.state, boost::make_function_output_iterator(
+							[&]( const std::pair< STATE, COST > & p )
+							{
+								if ( p.first == remove_element.state )
+								{ reverse_cost = p.second; }
+							} ) );
+					container.insert( element( parent, remove_element.cost - reverse_cost, remove_element.eval, parent_history ) );
+				}
+				else
+				{
+					state_index.modify( state_index.find( parent ), [&](element & e){ e.eval = std::max( e.eval, remove_element.eval ); } );
+				}
+				eval_index.erase( it );
+			}
+		}
+	}
+	return result;
 }
 
 #endif // SEARCH_HPP
