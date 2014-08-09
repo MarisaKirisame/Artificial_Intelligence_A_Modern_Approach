@@ -762,4 +762,91 @@ OUTITER memory_bounded_best_first_search(
 	return result;
 }
 
+template
+<
+	typename STATE, typename COST, typename EVAL,
+	typename EXPAND, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC, typename EVAL_OUTPUT
+>
+OUTITER iterative_best_first_search_helper(
+		const STATE & inital_state,
+		const COST & inital_cost,
+		const EVAL & upper_bound,
+		std::set< STATE > & history,
+		EXPAND f1,
+		RETURN_IF f2,
+		EVAL_FUNC f3,
+		EVAL_OUTPUT f4,
+		OUTITER result )
+{
+	if ( f2( inital_state ) )
+	{
+		* result = inital_state;
+		++result;
+		return result;
+	}
+	EVAL inital_eval = f3( inital_state, inital_cost );
+	if ( upper_bound < inital_eval )
+	{
+		f4( inital_eval );
+		return result;
+	}
+	std::vector< std::pair< STATE, EVAL > > vec;
+	f1( inital_state, std::back_inserter( vec ) );
+	for ( const std::pair< STATE, EVAL > & s : vec )
+	{
+		if ( history.count( s.first ) != 0 ) { continue; }
+		history.insert( s.first );
+		bool find_solution = false;
+		iterative_best_first_search_helper(
+					s,
+					inital_cost + s.second,
+					upper_bound,
+					history,
+					f1,
+					f2,
+					f3,
+					f4,
+					boost::make_function_output_iterator(
+						std::function< void( const STATE & ) >(
+							[&]( const auto & state )
+							{
+								if ( ! find_solution )
+								{
+									* result = inital_state;
+									++result;
+									find_solution = true;
+								}
+								* result = state;
+								++result;
+							} ) ) );
+		if ( find_solution ) { return result; }
+		history.erase( s );
+	}
+	return result;
+}
+
+template
+<
+	typename STATE, typename COST, typename EVAL,
+	typename EXPAND, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC, typename EVAL_OUTPUT
+>
+OUTITER iterative_best_first_search(
+		const STATE & inital_state,
+		const COST & inital_cost,
+		const EVAL & min_eval,
+		const EVAL & upper_bound,
+		EXPAND f1,
+		RETURN_IF f2,
+		EVAL_FUNC f3,
+		OUTITER result )
+{
+	EVAL e;
+	std::set< STATE > history;
+	while ( e < min_eval )
+	{
+		iterative_best_first_search_helper(
+					inital_state, inital_cost, upper_bound, history, f1, f2, f3, [&](const EVAL & ev){ e = std::max( e, ev ); }, result );
+	}
+}
+
 #endif // SEARCH_HPP
