@@ -741,14 +741,15 @@ OUTITER memory_bounded_best_first_search(
 		}
 		std::list< STATE > history = current_element.history;
 		history.push_back( current_element.state );
-		size_t count = 0;
 		f1( current_element.state, boost::make_function_output_iterator(
 				[&]( const std::pair< STATE, COST > & p )
 				{
-					++count;
-					add_element( p.first, p.second + current_element.cost, std::max( f3( p.first, p.second + current_element.cost, current_element.eval ) ), history );
+					add_element(
+								p.first,
+								p.second + current_element.cost,
+								std::max( f3( p.first, p.second + current_element.cost, current_element.eval ) ),
+								history );
 				} ) );
-		if ( count == 0 ) { add_parent( current_element ); } //avoid empty container situation
 		state_index.erase( current_element );
 		while ( container.size( ) > container_limit )
 		{
