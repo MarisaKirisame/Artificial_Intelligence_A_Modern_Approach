@@ -1,5 +1,6 @@
 #ifndef SEARCH_HPP
 #define SEARCH_HPP
+#include <stdexcept>
 #include <boost/optional/optional.hpp>
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
@@ -15,6 +16,7 @@
 #include <functional>
 #include <boost/function_output_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
+#include <random>
 template< typename STATE, typename EXPAND, typename RETURN_IF, typename OUTITER >
 OUTITER breadth_first_search( const STATE & inital_state, EXPAND f1, RETURN_IF f2, OUTITER result )
 {
@@ -710,6 +712,92 @@ OUTITER iterative_best_first_search(
 		iterative_best_first_search_helper(
 					inital_state, inital_cost, upper_bound, history, f1, f2, f3, [&](const EVAL & ev){ e = std::max( e, ev ); }, result );
 	}
+}
+
+template
+<
+    typename STATE,
+    typename EXPAND, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC
+>
+OUTITER hill_climbing(
+        const STATE & inital_state,
+        EXPAND f1,
+        RETURN_IF f2,
+        EVAL_FUNC f3,
+        OUTITER result )
+{ return beam_search( inital_state, 1, f1, f2, f3, result ); }
+
+template
+<
+    typename STATE,
+    typename EXPAND, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC
+>
+OUTITER beam_search(
+        const STATE & inital_state,
+        size_t beam_num,
+        EXPAND f1,
+        RETURN_IF f2,
+        EVAL_FUNC f3,
+        OUTITER result )
+{
+    if ( beam_num < 1 ) { throw std::domain_error( "must have at least one beam" ); }
+    typedef decltype( f3( inital_state ) ) EVAL;
+    std::multimap< EVAL, STATE > current = { { f3( inital_state ), inital_state } };
+    STATE best = inital_state;
+    while ( true )
+    {
+        if ( f2( current ) ) { return result; }
+        std::multimap< EVAL, STATE > map( current );
+        for ( const auto & i : current ) { f1( i.second, boost::make_function_output_iterator( [&](const STATE & s){ map.insert( {f3(s),s} ); } ) ); }
+        while ( map.size( ) > beam_num ) { map.erase( [&](){auto tem = map.end();--tem;return tem;}() ); }
+        if ( f3( best ) < f3( * map.begin( ) ) )
+        {
+            *result = current;
+            ++result;
+            best = current;
+        }
+        map.swap( current );
+    }
+    return result;
+}
+
+template
+<
+    typename STATE, typename TEMPERATURE, typename EP_COUNT, typename RANDOM_DEVICE,
+    typename EXPAND, typename RETURN_IF, typename OUTITER, typename MOVE_PROB, typename EVAL_FUNC
+>
+OUTITER simulated_annealing(
+        const STATE & inital_state,
+        const TEMPERATURE & tem,
+        const EP_COUNT & max_num,
+        RANDOM_DEVICE & rd,
+        EXPAND f1,
+        RETURN_IF f2,
+        MOVE_PROB f3,
+        EVAL_FUNC f4,
+        OUTITER result )
+{
+    EP_COUNT ep = 0;
+    STATE current = inital_state;
+    STATE best = inital_state;
+    while ( ep < max_num )
+    {
+        if ( f2( current, best, ep ) ) { return result; }
+        std::vector< STATE > next;
+        f1(current,std::back_inserter(next));
+        std::uniform_int_distribution<> uid( 0, next.size( ) );
+        std::uniform_real_distribution<> urd;
+        const STATE & comp_state = next[uid(rd)];
+        if ( f3( current, comp_state ) > urd(rd) ) { current = comp_state; }
+        if ( f4( best ) < f4( current ) )
+        {
+            *result = current;
+            ++result;
+            best = current;
+        }
+        ++ep;
+    }
+    return result;
 }
 
 #endif // SEARCH_HPP

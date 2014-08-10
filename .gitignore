@@ -1,4 +1,4 @@
-
+*.autosave
 *.pro.user
 main.cpp
 # Compiled Object files
