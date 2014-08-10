@@ -8,5 +8,6 @@ SOURCES += main.cpp
 
 HEADERS += \
     Search.hpp \
-    Agent.hpp
+    Agent.hpp \
+    Test.hpp
 
