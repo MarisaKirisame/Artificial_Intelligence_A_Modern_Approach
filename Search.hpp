@@ -716,88 +716,165 @@ OUTITER iterative_best_first_search(
 
 template
 <
-    typename STATE,
-    typename EXPAND, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC
+	typename STATE,
+	typename EXPAND, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC
 >
 OUTITER hill_climbing(
-        const STATE & inital_state,
-        EXPAND f1,
-        RETURN_IF f2,
-        EVAL_FUNC f3,
-        OUTITER result )
+		const STATE & inital_state,
+		EXPAND f1,
+		RETURN_IF f2,
+		EVAL_FUNC f3,
+		OUTITER result )
 { return beam_search( inital_state, 1, f1, f2, f3, result ); }
 
 template
 <
-    typename STATE,
-    typename EXPAND, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC
+	typename STATE,
+	typename EXPAND, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC
 >
 OUTITER beam_search(
-        const STATE & inital_state,
-        size_t beam_num,
-        EXPAND f1,
-        RETURN_IF f2,
-        EVAL_FUNC f3,
-        OUTITER result )
+		const STATE & inital_state,
+		size_t beam_num,
+		EXPAND f1,
+		RETURN_IF f2,
+		EVAL_FUNC f3,
+		OUTITER result )
 {
-    if ( beam_num < 1 ) { throw std::domain_error( "must have at least one beam" ); }
-    typedef decltype( f3( inital_state ) ) EVAL;
-    std::multimap< EVAL, STATE > current = { { f3( inital_state ), inital_state } };
-    STATE best = inital_state;
-    while ( true )
-    {
-        if ( f2( current ) ) { return result; }
-        std::multimap< EVAL, STATE > map( current );
-        for ( const auto & i : current ) { f1( i.second, boost::make_function_output_iterator( [&](const STATE & s){ map.insert( {f3(s),s} ); } ) ); }
-        while ( map.size( ) > beam_num ) { map.erase( [&](){auto tem = map.end();--tem;return tem;}() ); }
-        if ( f3( best ) < f3( * map.begin( ) ) )
-        {
-            *result = current;
-            ++result;
-            best = current;
-        }
-        map.swap( current );
-    }
-    return result;
+	if ( beam_num < 1 ) { throw std::domain_error( "must have at least one beam" ); }
+	typedef decltype( f3( inital_state ) ) EVAL;
+	std::multimap< EVAL, STATE > current = { { f3( inital_state ), inital_state } };
+	STATE best = inital_state;
+	while ( true )
+	{
+		if ( f2( current ) ) { return result; }
+		std::multimap< EVAL, STATE > map( current );
+		for ( const auto & i : current ) { f1( i.second, boost::make_function_output_iterator( [&](const STATE & s){ map.insert( {f3(s),s} ); } ) ); }
+		while ( map.size( ) > beam_num ) { map.erase( [&](){auto tem = map.end();--tem;return tem;}() ); }
+		if ( f3( best ) < f3( * map.begin( ) ) )
+		{
+			*result = current;
+			++result;
+			best = current;
+		}
+		map.swap( current );
+	}
+	return result;
 }
 
 template
 <
-    typename STATE, typename TEMPERATURE, typename EP_COUNT, typename RANDOM_DEVICE,
-    typename EXPAND, typename RETURN_IF, typename OUTITER, typename MOVE_PROB, typename EVAL_FUNC
+	typename STATE, typename EP_COUNT, typename RANDOM_DEVICE,
+	typename EXPAND, typename RETURN_IF, typename OUTITER, typename MOVE_PROB, typename EVAL_FUNC
 >
 OUTITER simulated_annealing(
-        const STATE & inital_state,
-        const TEMPERATURE & tem,
-        const EP_COUNT & max_num,
-        RANDOM_DEVICE & rd,
-        EXPAND f1,
-        RETURN_IF f2,
-        MOVE_PROB f3,
-        EVAL_FUNC f4,
-        OUTITER result )
+		const STATE & inital_state,
+		const EP_COUNT & max_num,
+		RANDOM_DEVICE & rd,
+		EXPAND f1,
+		RETURN_IF f2,
+		MOVE_PROB f3,
+		EVAL_FUNC f4,
+		OUTITER result )
 {
-    EP_COUNT ep = 0;
-    STATE current = inital_state;
-    STATE best = inital_state;
-    while ( ep < max_num )
-    {
-        if ( f2( current, best, ep ) ) { return result; }
-        std::vector< STATE > next;
-        f1(current,std::back_inserter(next));
-        std::uniform_int_distribution<> uid( 0, next.size( ) );
-        std::uniform_real_distribution<> urd;
-        const STATE & comp_state = next[uid(rd)];
-        if ( f3( current, comp_state ) > urd(rd) ) { current = comp_state; }
-        if ( f4( best ) < f4( current ) )
-        {
-            *result = current;
-            ++result;
-            best = current;
-        }
-        ++ep;
-    }
-    return result;
+	EP_COUNT ep = 0;
+	STATE current = inital_state;
+	STATE best = inital_state;
+	while ( ep < max_num )
+	{
+		if ( f2( current, best, ep ) ) { return result; }
+		std::vector< STATE > next;
+		f1(current,std::back_inserter(next));
+		std::uniform_int_distribution<> uid( 0, next.size( ) );
+		std::uniform_real_distribution<> urd;
+		const STATE & comp_state = next[uid(rd)];
+		if ( f3( current, comp_state ) > urd(rd) ) { current = comp_state; }
+		if ( f4( best ) < f4( current ) )
+		{
+			*result = current;
+			++result;
+			best = current;
+		}
+		++ep;
+	}
+	return result;
 }
 
+template
+<
+	typename STATE, typename STEP,
+	typename DELTA, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC, typename STEP_CHANGE
+>
+OUTITER gradient_descent_method(
+		const STATE & inital_state,
+		const STEP & step,
+		DELTA f1,
+		RETURN_IF f2,
+		EVAL_FUNC f3,
+		STEP_CHANGE f4,
+		OUTITER result )
+{
+	STEP a( step );
+	STATE current = inital_state;
+	STATE best = inital_state;
+	while ( true )
+	{
+		if ( f2( current, best ) ) { return result; }
+		current += a * f1( inital_state );
+		if ( f3( best ) < f3( current ) )
+		{
+			*result = current;
+			++result;
+			best = current;
+		}
+		a = f4( a );
+	}
+	return result;
+}
+
+template
+<
+	typename ACTION, typename STATE,
+	typename GOAL_TEST, typename ALL_ACTION, typename POSSIBLE_STATE
+>
+boost::optional< std::map< STATE, ACTION > > and_or_search( const STATE & inital_state, GOAL_TEST f1, ALL_ACTION f2, POSSIBLE_STATE f3 )
+{
+	if ( f1( inital_state ) ) { return boost::optional< std::map< STATE, ACTION > >( { } ); }
+	const boost::optional< std::map< STATE, ACTION > > faliure;
+	std::set< STATE > founded;
+	auto and_test = [&]( const auto & or_t, const std::vector< STATE > & vec, std::set< STATE > & history )
+	{
+		std::map< STATE, ACTION > ret;
+		bool dead_end = true;
+		for ( const STATE & s : vec )
+		{
+			if ( history.count( s ) != 0 ) { continue; }
+			auto res = or_t( or_t, s, history );
+			dead_end = false;
+			if ( ! res ) { return faliure; }
+			ret.insert( res->begin( ), res->end( ) );
+		}
+		return dead_end ? faliure : boost::optional< std::map< STATE, ACTION > >( ret );
+	};
+	auto or_test = [&]( const auto & self, const STATE & s, std::set< STATE > & history )
+	{
+		if ( f1( s ) ) { return boost::optional< std::map< STATE, ACTION > >( std::map< STATE, ACTION >( { } ) ); }
+		boost::optional< std::map< STATE, ACTION > > ret;
+		f2( s, boost::make_function_output_iterator(
+				[&](const ACTION & act)
+				{
+					if ( ! ret )
+					{
+						history.insert( s );
+						std::vector< STATE > vec;
+						f3( s, act, std::back_inserter( vec ) );
+						ret = and_test( self, vec, history );
+						if ( ret ) { ret->insert( { s, act } ); }
+						history.erase( s );
+					}
+				} ) );
+		return ret;
+	};
+	std::set< STATE > history = { };
+	return or_test( or_test, inital_state, history );
+}
 #endif // SEARCH_HPP

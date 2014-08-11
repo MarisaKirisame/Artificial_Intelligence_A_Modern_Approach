@@ -8,6 +8,7 @@ template< typename STATE, typename ACTION >
 struct table_driven_agent
 {
 	std::map< STATE, ACTION > map;
+	table_driven_agent( const std::map< STATE, ACTION > & map ) : map( map ) { }
 	boost::optional< ACTION > operator ( )( const STATE & s ) const
 	{
 		auto res = map.find( s );
