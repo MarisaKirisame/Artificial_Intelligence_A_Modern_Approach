@@ -109,7 +109,7 @@ struct online_DFS_agent
 			act( state, std::back_inserter( vec ) );
 			if ( vec.empty( ) ) { return false; }
 			bool made_act = false;
-			if ( map.count( state ) == 0 ) { map.insert( { s, std::map< ACTION, STATE >( ) } ); }
+			if ( map.count( state ) == 0 ) { map.insert( { state, std::map< ACTION, STATE >( ) } ); }
 			std::map< ACTION, STATE > & m = map.find( state )->second;
 			for ( const ACTION a : vec )
 			{
@@ -118,16 +118,16 @@ struct online_DFS_agent
 					if ( made_act ) { untried.insert( std::make_pair( state, a ) ); }
 					else
 					{
-						STATE tem = ns( s, a );
+						STATE tem = ns( state, a );
 						m.insert( a, tem );
-						std::swap( tem, s );
+						std::swap( tem, state );
 						made_act = true;
 					}
 				}
 			}
 			if ( ! made_act )
 			{
-				std::vector< STATE > vec;
+				std::vector< ACTION > vec;
 				depth_first_search(
 							s,
 							[&]( const STATE & state, auto it )
@@ -146,6 +146,7 @@ struct online_DFS_agent
 							},
 							[&](const STATE & st){ return untried.count( st ) != 0; },
 							std::back_inserter( vec ) );
+				for ( const ACTION & a : vec ) { state = ns( state, a ); }
 			}
 		}
 	}
