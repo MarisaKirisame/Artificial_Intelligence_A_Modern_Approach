@@ -1,3 +1,4 @@
+.directory
 *.autosave
 *.pro.user
 main.cpp

@@ -355,86 +355,93 @@ struct postive_infinity
 	}
 };
 
-template< typename STATE, typename EXPAND, typename RETURN_IF, typename OUTITER >
+template< typename STATE, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename OUTITER >
 OUTITER depth_first_search(
 		const STATE & inital_state,
-		EXPAND f1,
-		RETURN_IF f2,
+		ALL_ACTION f1,
+		NEXT_STATE f2,
+		RETURN_IF f3,
 		OUTITER result )
-{ return depth_first_search( inital_state, postive_infinity( ), f1, f2, result ); }
+{ return depth_first_search( inital_state, postive_infinity( ), f1, f2, f3, result ); }
 
-template< typename STATE, typename NUM, typename EXPAND, typename RETURN_IF, typename OUTITER >
+template< typename STATE, typename NUM, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename OUTITER >
 OUTITER depth_first_search(
 		const STATE & inital_state,
 		const NUM & depth,
-		EXPAND f1,
-		RETURN_IF f2,
+		ALL_ACTION f1,
+		NEXT_STATE f2,
+		RETURN_IF f3,
 		OUTITER result )
 {
 	std::set< STATE > history = { inital_state };
-	return depth_first_search( inital_state, depth, history, f1, f2, result );
+	return depth_first_search( inital_state, depth, history, f1, f2, f3, result );
 }
 
-template< typename STATE, typename NUM, typename EXPAND, typename RETURN_IF, typename OUTITER >
+template< typename STATE, typename NUM, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename OUTITER >
 OUTITER depth_first_search(
 		const STATE & inital_state,
 		const NUM & depth,
 		std::set< STATE > & history,
-		EXPAND f1,
-		RETURN_IF f2,
+		ALL_ACTION f1,
+		NEXT_STATE f2,
+		RETURN_IF f3,
 		OUTITER result )
 {
-	if ( f2( inital_state ) )
-	{
-		* result = inital_state;
-		++result;
-		return result;
-	}
+	if ( f3( inital_state ) ) { return result; }
 	if ( depth < 1 ) { return result; }
 	auto new_depth = depth - 1;
-	std::vector< STATE > vec;
-	f1( inital_state, std::back_inserter( vec ) );
-	for ( const STATE & s : vec )
+	std::vector< std::pair< STATE, std::function< void ( ) > > > vec;
+	f1( inital_state, boost::make_function_output_iterator(
+			[&](const auto & action)
+			{
+				vec.push_back(
+							std::make_pair(
+								f2( inital_state, action ),
+								[action,&result](){ * result = action; ++result; } ) );
+			} ) );
+	for ( const std::pair< STATE, std::function< void ( ) > > & s : vec )
 	{
-		if ( history.count( s ) != 0 ) { continue; }
-		history.insert( s );
+		if ( f3( s.first ) ) { s.second( ); return result; }
+		if ( history.count( s.first ) != 0 ) { continue; }
+		history.insert( s.first );
 		bool find_solution = false;
 		depth_first_search(
-					s,
+					s.first,
 					new_depth,
 					history,
 					f1,
 					f2,
+					f3,
 					boost::make_function_output_iterator(
 						std::function< void( const STATE & ) >(
-							[&]( const auto & state )
+							[&]( const auto & action )
 							{
 								if ( ! find_solution )
 								{
-									* result = inital_state;
-									++result;
+									s.second( );
 									find_solution = true;
 								}
-								* result = state;
+								* result = action;
 								++result;
 							} ) ) );
 		if ( find_solution ) { return result; }
-		history.erase( s );
+		history.erase( s.first );
 	}
 	return result;
 }
 
-template< typename STATE, typename EXPAND, typename RETURN_IF, typename OUTITER >
+template< typename STATE, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename OUTITER >
 OUTITER iterative_deepening_depth_first_search( const STATE & inital_state,
-												EXPAND f1,
-												RETURN_IF f2,
+												ALL_ACTION f1,
+												NEXT_STATE f2,
+												RETURN_IF f3,
 												OUTITER result )
 {
 	size_t i = 0;
 	bool break_loop = false;
 	while ( ! break_loop )
 	{
-		depth_first_search( inital_state, i, f1, f2, boost::make_function_output_iterator(
+		depth_first_search( inital_state, i, f1, f2, f3, boost::make_function_output_iterator(
 								[&]( const STATE & s )
 								{
 									break_loop = true;
@@ -784,7 +791,7 @@ OUTITER simulated_annealing(
 		if ( f2( current, best, ep ) ) { return result; }
 		std::vector< STATE > next;
 		f1(current,std::back_inserter(next));
-		std::uniform_int_distribution<> uid( 0, next.size( ) );
+		std::uniform_int_distribution<> uid( 0, next.size( ) - 1 );
 		std::uniform_real_distribution<> urd;
 		const STATE & comp_state = next[uid(rd)];
 		if ( f3( current, comp_state ) > urd(rd) ) { current = comp_state; }

@@ -4,8 +4,8 @@
 #define BOOST_TEST_DYN_LINK
 #include <boost/test/unit_test.hpp>
 #include <utility>
-#include <Agent.hpp>
-#include "Search.hpp"
+#include <agent.hpp>
+#include "search.hpp"
 
 enum location
 {
@@ -104,9 +104,9 @@ BOOST_AUTO_TEST_CASE( DFS )
 										boost::make_transform_iterator( tem.second, sf ),
 										it );
 						},
+						[](location, location ret){return ret;},
 						[](location l){ return l == Bucharest; },
 						std::back_inserter( res ) );
-	BOOST_CHECK_EQUAL( res.front( ), Sibiu );
 	BOOST_CHECK_EQUAL( res.back( ), Bucharest );
 }
 
@@ -124,9 +124,10 @@ BOOST_AUTO_TEST_CASE( IDDFS )
 								boost::make_transform_iterator( tem.second, sf ),
 								it );
 				},
+				[](location, location ret){ return ret; },
 				[](location l){ return l == Bucharest; },
 				std::back_inserter( res ) );
-	BOOST_CHECK_EQUAL( res, std::list< location >( { Sibiu, Fagaras, Bucharest } ) );
+	BOOST_CHECK_EQUAL( res, std::list< location >( { Fagaras, Bucharest } ) );
 }
 
 BOOST_AUTO_TEST_CASE( BBFS )

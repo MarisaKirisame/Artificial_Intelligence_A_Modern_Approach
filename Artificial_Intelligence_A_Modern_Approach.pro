@@ -7,7 +7,7 @@ QMAKE_CXXFLAGS += -std=c++1y
 SOURCES += main.cpp
 
 HEADERS += \
-    Search.hpp \
-    Agent.hpp \
-    Test.hpp
+    agent.hpp \
+    search.hpp \
+    test.hpp
 
