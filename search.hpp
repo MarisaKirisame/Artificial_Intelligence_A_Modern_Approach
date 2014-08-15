@@ -17,6 +17,7 @@
 #include <boost/function_output_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 #include <random>
+#include <tuple>
 template< typename STATE, typename EXPAND, typename RETURN_IF, typename OUTITER >
 OUTITER breadth_first_search( const STATE & inital_state, EXPAND f1, RETURN_IF f2, OUTITER result )
 {
@@ -884,4 +885,90 @@ boost::optional< std::map< STATE, ACTION > > and_or_search( const STATE & inital
 	std::set< STATE > history = { };
 	return or_test( or_test, inital_state, history );
 }
+
+template< typename STATE, typename NEXT_STATE, typename IS_END, typename EVAL_FUNC >
+auto minmax_search(
+		const STATE & inital_state,
+		bool maximize,
+		NEXT_STATE f1,
+		IS_END f2,
+		EVAL_FUNC f3 )
+{
+	typedef decltype( f4( inital_state ) ) EVAL;
+	if ( f3( inital_state ) ) { return f4( inital_state ); }
+	std::vector< std::pair< STATE, EVAL > > vec;
+	f1( inital_state,
+		boost::make_function_output_iterator( [&](const STATE & state) { vec.push_back( std::make_pair( state, minmax_search( state, ! maximize, f1, f2, f3 ) ) ); } ) );
+	assert( ! vec.empty( ) );
+	std::sort( vec.begin( ), vec.end( ), []( const std::pair< STATE, EVAL > & l, const std::pair< STATE, EVAL > & r ){ return l.second < r.second; } );
+	return maximize ? vec.back( ).second : vec.front( ).second;
+}
+
+template< typename STATE, typename NEXT_STATE, typename IS_END, typename EVAL_FUNC, typename STOP_IF, typename OUTITER >
+OUTITER alpha_beta_pruning_search(
+		const STATE & inital_state,
+		bool maximize,
+		NEXT_STATE f1,
+		IS_END f2,
+		EVAL_FUNC f3,
+		STOP_IF f4,
+		OUTITER result )
+{
+	if ( f2( inital_state ) )
+	{
+		* result = f3( inital_state ).first;
+		++result;
+		return result;
+	}
+	typedef decltype( f3( inital_state ).first ) EVAL;
+	struct tree
+	{
+		const STATE & this_state;
+		bool exploration_completed;
+		EVAL this_eval;
+		std::pair< EVAL, EVAL > bound; //First is upper bound
+		bool maximize;
+		std::vector< std::shared_ptr< tree > > childs;
+	};
+	auto explore =
+			[&]( const tree & t )
+			{
+				if ( t.exploration_completed ) { return; }
+				if ( t.childs.empty( ) ) { f1( t.this_state, boost::make_function_output_iterator( [&](const STATE & s)
+				{
+					auto res = f3( s );
+					t.childs.push_back( std::shared_ptr< tree >( new tree( { s, f2( s ), res.first, res.second, ! t.maximize, std::vector< std::shared_ptr< tree > >( ) } ) ) ); } ) );
+				}
+				else
+				{
+					assert( ! t.childs.empty( ) );
+					EVAL current_bound = std::max_element(
+								t.childs.begin( ),
+								t.childs.end( ),
+								[&]( const std::shared_ptr< tree > & l, const std::shared_ptr< tree > & r ) { return t.maximize ? l->bound.second < l->bound.second : l->bound.first > l->bound.first; } );
+					for ( auto it = t.childs.begin( ); it != t.childs.end( ); ++it )
+					{
+						std::shared_ptr< tree > & p = * it;
+						if ( t.maximize ? p->bound.first < current_bound : p->bound.second > current_bound ) { it = t.childs.erase( it ); }
+						explore( * p );
+					}
+				}
+				t.exploration_completed = std::all_of( t.childs.begin( ), t.childs.end( ), []( const std::shared_ptr< tree > & t ){ return t->exploration_completed; } );
+				t.bound.first = std::max_element( t.childs.begin( ), t.childs.end( ), []( const std::shared_ptr< tree > & l, const std::shared_ptr< tree > & r ){ return l->bound.first < r->bound.first; } );
+				t.bound.second = std::min_element( t.childs.begin( ), t.childs.end( ), []( const std::shared_ptr< tree > & l, const std::shared_ptr< tree > & r ){ return l->bound.second < r->bound.second; } );
+				auto eval_comp = []( const std::shared_ptr< tree > & l, const std::shared_ptr< tree > & r ){ return l->this_eval < r->this_eval; };
+				t.this_eval = t.maximize ? std::max_element( t.childs.begin( ), t.hilds.end( ), eval_comp ) : std::min_element( t.childs.begin( ), t.childs.end( ), eval_comp );
+			};
+	auto res = f3( s );
+	tree root( { inital_state, false, res.first, res.second, maximize, std::vector< std::shared_ptr< tree > >( ) } );
+	while ( ! root.exploration_completed )
+	{
+		* result = root.this_eval;
+		++result;
+		if ( f4( ) ) { return result; }
+		explore( root );
+	}
+	return result;
+}
+
 #endif // SEARCH_HPP
