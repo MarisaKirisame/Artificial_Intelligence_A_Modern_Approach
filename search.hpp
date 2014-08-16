@@ -959,7 +959,7 @@ OUTITER alpha_beta_pruning_search(
 				auto eval_comp = []( const std::shared_ptr< tree > & l, const std::shared_ptr< tree > & r ){ return l->this_eval < r->this_eval; };
 				t.this_eval = t.maximize ? std::max_element( t.childs.begin( ), t.hilds.end( ), eval_comp ) : std::min_element( t.childs.begin( ), t.childs.end( ), eval_comp );
 			};
-	auto res = f3( s );
+	auto res = f3( inital_state );
 	tree root( { inital_state, false, res.first, res.second, maximize, std::vector< std::shared_ptr< tree > >( ) } );
 	while ( ! root.exploration_completed )
 	{

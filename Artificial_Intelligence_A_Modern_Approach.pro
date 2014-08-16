@@ -9,5 +9,6 @@ SOURCES += main.cpp
 HEADERS += \
     agent.hpp \
     search.hpp \
-    test.hpp
+    test.hpp \
+    CSP.hpp
 
