@@ -236,7 +236,30 @@ BOOST_AUTO_TEST_CASE( CSP )
 	const size_t C3 = 8;
 	std::set< size_t > digits { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
 	std::vector< std::function< bool( const std::vector< size_t > & ) > > constraint;
+	constraint.push_back( [&]( const std::vector< size_t > & ass ){ return ( ass.size( ) < 7 ) || ( ass[O] * 2 == ass[R] + 10 * ass[C1] ); } );
+	constraint.push_back( [&]( const std::vector< size_t > & ass ){ return ( ass.size( ) < 8 ) || ( ass[C1] + ass[W] * 2 == ass[U] + 10 * ass[C2] ); } );
+	constraint.push_back( [&]( const std::vector< size_t > & ass ){ return ( ass.size( ) < 9 ) || ( ass[C2] + ass[T] * 2 == ass[O] + 10 * ass[C3] ); } );
+	constraint.push_back( [&]( const std::vector< size_t > & ass ){ return ( ass.size( ) < 9 ) || ( ass[C3] == ass[F] ); } );
+	constraint.push_back( [&]( const std::vector< size_t > & ass ){ return ( ass.empty( ) ) || ( ass[F] != 0 ); } );
+	constraint.push_back(
+				[&]( const std::vector< size_t > & ass )
+				{
+					std::set< size_t > finded_before;
+					for ( size_t i : ass )
+					{
+						if ( finded_before.size( ) >= 6 ) { return true; }
+						auto res = finded_before.insert( i );
+						if ( ! res.second ) { return false; }
+					}
+					return true;
+				} );
 	backtracking_search( std::vector< decltype( digits ) >( 9, digits ), constraint.begin( ), constraint.end( ), std::back_inserter( result ) );
+	BOOST_CHECK_EQUAL( result.size( ), 7 );
+	for ( const std::vector< size_t > & ass : result )
+	{
+		for ( const auto & con : constraint )
+		{ BOOST_CHECK( con( ass ) ); }
+	}
 }
 
 #endif // TEST_HPP
