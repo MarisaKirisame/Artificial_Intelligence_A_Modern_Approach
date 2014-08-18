@@ -224,38 +224,106 @@ BOOST_AUTO_TEST_CASE( AOS )
 
 BOOST_AUTO_TEST_CASE( CSP )
 {
-	std::vector< std::vector< size_t > > result;
-	const size_t F = 0;
-	const size_t T = 1;
-	const size_t U = 2;
-	const size_t W = 3;
-	const size_t R = 4;
-	const size_t O = 5;
-	const size_t C1 = 6;
-	const size_t C2 = 7;
-	const size_t C3 = 8;
-	std::set< size_t > digits { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
-	std::vector< std::function< bool( const std::vector< size_t > & ) > > constraint;
-	constraint.push_back( [&]( const std::vector< size_t > & ass ){ return ( ass.size( ) < 7 ) || ( ass[O] * 2 == ass[R] + 10 * ass[C1] ); } );
-	constraint.push_back( [&]( const std::vector< size_t > & ass ){ return ( ass.size( ) < 8 ) || ( ass[C1] + ass[W] * 2 == ass[U] + 10 * ass[C2] ); } );
-	constraint.push_back( [&]( const std::vector< size_t > & ass ){ return ( ass.size( ) < 9 ) || ( ass[C2] + ass[T] * 2 == ass[O] + 10 * ass[C3] ); } );
-	constraint.push_back( [&]( const std::vector< size_t > & ass ){ return ( ass.size( ) < 9 ) || ( ass[C3] == ass[F] ); } );
-	constraint.push_back( [&]( const std::vector< size_t > & ass ){ return ( ass.empty( ) ) || ( ass[F] != 0 ); } );
+	using boost::any_cast;
+	enum var { F, T, U, W, R, O, C1, C2, C3 };
+	std::vector< std::map< var, boost::any > > result;
+	auto s = [](const auto & t)->size_t{return t;};
+	std::list< boost::any > digits { s(0), s(1), s(2), s(3), s(4), s(5), s(6), s(7), s(8), s(9) };
+	std::list< boost::any > carry { s(0), s(1) };
+	std::vector< std::function< bool( const std::map< var, boost::any > & ) > > constraint;
 	constraint.push_back(
-				[&]( const std::vector< size_t > & ass )
+				[&]( const std::map< var, boost::any > & ass )
+				{
+					auto O_it = ass.find( O );
+					auto R_it = ass.find( R );
+					auto C1_it = ass.find( C1 );
+					if ( O_it == ass.end( ) || R_it == ass.end( ) || C1_it == ass.end( ) ) { return true; }
+					return
+							any_cast< size_t >( O_it->second ) * 2 ==
+							any_cast< size_t >( R_it->second ) + any_cast< size_t >( C1_it->second ) * 10;
+				} );
+	constraint.push_back(
+				[&]( const std::map< var, boost::any > & ass )
+				{
+					auto O_it = ass.find( O );
+					auto R_it = ass.find( R );
+					if ( O_it == ass.end( ) || R_it == ass.end( ) ) { return true; }
+					return ( any_cast< size_t >( O_it->second ) * 2 - any_cast< size_t >( R_it->second ) ) % 10 == 0;
+				} );
+	constraint.push_back(
+				[&]( const std::map< var, boost::any > & ass )
+				{
+					auto C1_it = ass.find( C1 );
+					auto W_it = ass.find( W );
+					auto U_it = ass.find( U );
+					auto C2_it = ass.find( C2 );
+					if ( C1_it == ass.end( ) || W_it == ass.end( ) || U_it == ass.end( ) || C2_it == ass.end( ) ) { return true; }
+					return
+							any_cast< size_t >( C1_it->second ) + any_cast< size_t >( W_it->second ) * 2 ==
+							any_cast< size_t >( U_it->second ) + 10 * any_cast< size_t >( C2_it->second );
+				} );
+	constraint.push_back(
+				[&]( const std::map< var, boost::any > & ass )
+				{
+					auto C1_it = ass.find( C1 );
+					auto W_it = ass.find( W );
+					auto U_it = ass.find( U );
+					if ( C1_it == ass.end( ) || W_it == ass.end( ) || U_it == ass.end( ) ) { return true; }
+					return ( any_cast< size_t >( C1_it->second ) + any_cast< size_t >( W_it->second ) * 2 - any_cast< size_t >( U_it->second ) ) % 10 == 0;
+				} );
+	constraint.push_back(
+				[&]( const std::map< var, boost::any > & ass )
+				{
+					auto C2_it = ass.find( C2 );
+					auto T_it = ass.find( T );
+					auto O_it = ass.find( O );
+					auto C3_it = ass.find( C3 );
+					if ( C2_it == ass.end( ) || T_it == ass.end( ) || O_it == ass.end( ) || C3_it == ass.end( ) ) { return true; }
+					return
+							any_cast< size_t >( C2_it->second ) + any_cast< size_t >( T_it->second ) * 2 ==
+							any_cast< size_t >( O_it->second ) + 10 * any_cast< size_t >( C3_it->second );
+				} );
+	constraint.push_back(
+				[&]( const std::map< var, boost::any > & ass )
+				{
+					auto C2_it = ass.find( C2 );
+					auto T_it = ass.find( T );
+					auto O_it = ass.find( O );
+					if ( C2_it == ass.end( ) || T_it == ass.end( ) || O_it == ass.end( ) ) { return true; }
+					return ( any_cast< size_t >( C2_it->second ) + any_cast< size_t >( T_it->second ) * 2 - any_cast< size_t >( O_it->second ) ) % 10 == 0;
+				} );
+	constraint.push_back(
+				[&]( const std::map< var, boost::any > & ass )
+				{
+					auto C3_it = ass.find( C3 );
+					auto F_it = ass.find( F );
+					if ( C3_it == ass.end( ) || F_it == ass.end( ) ) { return true; }
+					return any_cast< size_t >( C3_it->second ) == any_cast< size_t >( F_it->second );
+				} );
+	constraint.push_back(
+				[&]( const std::map< var, boost::any > & ass )
+				{
+					auto F_it = ass.find( F );
+					if ( F_it == ass.end( ) ) { return true; }
+					return any_cast< size_t >( F_it->second ) != 0;
+				} );
+	constraint.push_back(
+				[&]( const std::map< var, boost::any > & ass )
 				{
 					std::set< size_t > finded_before;
-					for ( size_t i : ass )
+					for ( const std::pair< var, boost::any > & i : ass )
 					{
-						if ( finded_before.size( ) >= 6 ) { return true; }
-						auto res = finded_before.insert( i );
+						if ( i.first == C1 || i.first == C2 || i.first == C3 ) { continue; }
+						auto res = finded_before.insert( any_cast< size_t >( i.second ) );
 						if ( ! res.second ) { return false; }
 					}
 					return true;
 				} );
-	backtracking_search( std::vector< decltype( digits ) >( 9, digits ), constraint.begin( ), constraint.end( ), std::back_inserter( result ) );
+	backtracking_search( std::map< var, std::list< boost::any > >(
+	{ {F, digits},{O, digits},{U, digits},{R, digits},{T, digits},{W, digits},{C1, carry},{C2, carry},{C3, carry} } ),
+						 constraint.begin( ), constraint.end( ), std::back_inserter( result ) );
 	BOOST_CHECK_EQUAL( result.size( ), 7 );
-	for ( const std::vector< size_t > & ass : result )
+	for ( const std::map< var, boost::any > & ass : result )
 	{
 		for ( const auto & con : constraint )
 		{ BOOST_CHECK( con( ass ) ); }
