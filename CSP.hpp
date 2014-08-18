@@ -5,10 +5,6 @@
 #include <cassert>
 #include <algorithm>
 template< typename T, typename ITER, typename OUTITER >
-OUTITER backtracking_search( const std::vector< std::set< T > > & variable, ITER constrain_begin, ITER constrain_end, OUTITER result )
-{ return backtracking_search( variable, { }, constrain_begin, constrain_end, result ); }
-
-template< typename T, typename ITER, typename OUTITER >
 OUTITER backtracking_search(
 		const std::vector< std::set< T > > & variable, const std::vector< T > & partial_assignment, ITER constrain_begin, ITER constrain_end, OUTITER result )
 {
@@ -21,7 +17,7 @@ OUTITER backtracking_search(
 		return result;
 	}
 	std::vector< T > vec( partial_assignment );
-	std::set< T > & next_element = variable[partial_assignment.size( )];
+	const std::set< T > & next_element = variable[partial_assignment.size( )];
 	for ( const T & t : next_element )
 	{
 		vec.push_back( t );
@@ -30,4 +26,9 @@ OUTITER backtracking_search(
 	}
 	return result;
 }
+
+template< typename T, typename ITER, typename OUTITER >
+OUTITER backtracking_search( const std::vector< std::set< T > > & variable, ITER constrain_begin, ITER constrain_end, OUTITER result )
+{ return backtracking_search( variable, std::vector< T >( ), constrain_begin, constrain_end, result ); }
+
 #endif // CSP_HPP

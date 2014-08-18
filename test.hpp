@@ -4,7 +4,9 @@
 #define BOOST_TEST_DYN_LINK
 #include <boost/test/unit_test.hpp>
 #include <utility>
-#include <agent.hpp>
+#include <functional>
+#include "agent.hpp"
+#include "CSP.hpp"
 #include "search.hpp"
 
 enum location
@@ -219,4 +221,22 @@ BOOST_AUTO_TEST_CASE( AOS )
 	std::set< vacum_world > h;
 	BOOST_CHECK( test( test, vacum_world( false, false, false ), h ) );
 }
+
+BOOST_AUTO_TEST_CASE( CSP )
+{
+	std::vector< std::vector< size_t > > result;
+	const size_t F = 0;
+	const size_t T = 1;
+	const size_t U = 2;
+	const size_t W = 3;
+	const size_t R = 4;
+	const size_t O = 5;
+	const size_t C1 = 6;
+	const size_t C2 = 7;
+	const size_t C3 = 8;
+	std::set< size_t > digits { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+	std::vector< std::function< bool( const std::vector< size_t > & ) > > constraint;
+	backtracking_search( std::vector< decltype( digits ) >( 9, digits ), constraint.begin( ), constraint.end( ), std::back_inserter( result ) );
+}
+
 #endif // TEST_HPP
