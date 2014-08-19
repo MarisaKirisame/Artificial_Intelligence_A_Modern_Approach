@@ -44,11 +44,18 @@ OUTITER backtracking_search(
 		ITER constraint_begin, ITER constraint_end, OUTITER result )
 {
 	assert( partial_assignment.size( ) <= variable.size( ) );
-	if (
+	if ( modify_variable.size( ) == 1 )
+	{
+		variable.erase( * modify_variable.begin( ) );
+		auto it = partial_assignment.find( * modify_variable.begin( ) );
+		assert( it != partial_assignment.end( ) );
+		variable.insert( std::make_pair( * modify_variable.begin( ), std::list< boost::any >( { it->second } ) ) );
+	}
+	assert ( !
 			std::any_of(
 				constraint_begin,
 				constraint_end,
-				[&]( const constraint< VARIABLE_ID_T > & con ) { return ! con( partial_assignment ); } ) ) { return result; }
+				[&]( const constraint< VARIABLE_ID_T > & con ) { return ! con( partial_assignment ); } ) );
 	if ( partial_assignment.size( ) == variable.size( ) )
 	{
 		* result = partial_assignment;
@@ -141,6 +148,7 @@ OUTITER backtracking_search(
 							( partial_assignment.count( r.first ) == 0 ? r.second.size( ) : std::numeric_limits< size_t >::max( ) );
 				} );
 	assert( partial_assignment.count( next_element.first ) == 0 );
+	//if ( next_element.second.empty( ) ) { throw; }
 	for ( const boost::any & t : next_element.second )
 	{
 		auto ret = partial_assignment.insert( std::make_pair( next_element.first, t ) );
