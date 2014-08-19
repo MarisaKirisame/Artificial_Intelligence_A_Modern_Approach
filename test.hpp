@@ -299,7 +299,7 @@ BOOST_AUTO_TEST_CASE( CSP )
 	}
 	backtracking_search( std::map< var, std::list< boost::any > >(
 	{ {F, digits},{O, digits},{U, digits},{R, digits},{T, digits},{W, digits},{C1, carry},{C2, carry},{C3, carry} } ),
-						 con.begin( ), con.end( ), std::back_inserter( result ) );
+						 4, con.begin( ), con.end( ), std::back_inserter( result ) );
 	BOOST_CHECK_EQUAL( result.size( ), 7 );
 	for ( const std::map< var, boost::any > & ass : result )
 	{
