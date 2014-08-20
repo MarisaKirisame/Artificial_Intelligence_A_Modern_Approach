@@ -228,44 +228,44 @@ BOOST_AUTO_TEST_CASE( CSP )
 	std::vector< std::map< var, size_t > > result;
 	std::list< size_t > digits { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
 	std::list< size_t > carry { 0, 1 };
-	std::list< constraint< var, size_t > > con;
+	std::list< local_constraint< var, size_t > > con;
 	con.push_back(
-				make_constraint< var, size_t >(
+				make_local_constraint< var, size_t >(
 					std::vector< var >( { O, R, C1 } ),
 					[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
 					{ return ass[0] * 2 == ass[1] + ass[2] * 10; } ) );
 	con.push_back(
-				make_constraint< var, size_t >(
+				make_local_constraint< var, size_t >(
 					std::vector< var >( { O, R } ),
 					[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
 					{ return ( ass[0] * 2 - ass[1] ) % 10 == 0; } ) );
 	con.push_back(
-				make_constraint< var, size_t >(
+				make_local_constraint< var, size_t >(
 					std::vector< var >( { C1, W, U, C2 } ),
 					[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
 					{ return ass[0] + ass[1] * 2 == ass[2] + 10 * ass[3]; } ) );
 	con.push_back(
-				make_constraint< var, size_t >(
+				make_local_constraint< var, size_t >(
 					std::vector< var >( { C1, W, U } ),
 					[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
 					{ return ( ass[0] + ass[1] * 2 - ass[2] ) % 10 == 0; } ) );
 	con.push_back(
-				make_constraint< var, size_t >(
+				make_local_constraint< var, size_t >(
 					std::vector< var >( { C2, T, O, C3 } ),
 					[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
 					{ return ass[0] + ass[1] * 2 == ass[2] + 10 * ass[3]; } ) );
 	con.push_back(
-				make_constraint< var, size_t >(
+				make_local_constraint< var, size_t >(
 					std::vector< var >( { C2, T, O } ),
 					[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
 					{ return ( ass[0] + ass[1] * 2 - ass[2] ) % 10 == 0; } ) );
 	con.push_back(
-				make_constraint< var, size_t >(
+				make_local_constraint< var, size_t >(
 					std::vector< var >( { C3, F } ),
 					[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
 					{ return ass[0] == ass[1]; } ) );
 	con.push_back(
-				make_constraint< var, size_t >(
+				make_local_constraint< var, size_t >(
 					std::vector< var >( { F } ),
 					[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
 					{ return ass[0] != 0; } ) );
@@ -276,7 +276,7 @@ BOOST_AUTO_TEST_CASE( CSP )
 			if ( i > j )
 			{
 				con.push_back(
-							make_constraint< var, size_t >(
+							make_local_constraint< var, size_t >(
 								std::vector< var >( { i, j } ),
 								[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
 								{ return ass[0] != ass[1]; } ) );
