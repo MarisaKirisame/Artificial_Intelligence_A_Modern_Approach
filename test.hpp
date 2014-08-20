@@ -224,65 +224,51 @@ BOOST_AUTO_TEST_CASE( AOS )
 
 BOOST_AUTO_TEST_CASE( CSP )
 {
-	using boost::any_cast;
 	enum var { F, T, U, W, R, O, C1, C2, C3 };
-	std::vector< std::map< var, boost::any > > result;
-	auto s = [](const auto & t)->size_t{return t;};
-	std::list< boost::any > digits { s(0), s(1), s(2), s(3), s(4), s(5), s(6), s(7), s(8), s(9) };
-	std::list< boost::any > carry { s(0), s(1) };
-	std::vector< constraint< var > > con;
+	std::vector< std::map< var, size_t > > result;
+	std::list< size_t > digits { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+	std::list< size_t > carry { 0, 1 };
+	std::list< constraint< var, size_t > > con;
 	con.push_back(
-				make_constraint(
+				make_constraint< var, size_t >(
 					std::vector< var >( { O, R, C1 } ),
-					[&]( const std::vector< std::reference_wrapper< const boost::any > > & ass )
-					{
-						return
-								any_cast< size_t >( ass[0] ) * 2 ==
-								any_cast< size_t >( ass[1] ) + any_cast< size_t >( ass[2] ) * 10;
-					} ) );
+					[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
+					{ return ass[0] * 2 == ass[1] + ass[2] * 10; } ) );
 	con.push_back(
-				make_constraint(
+				make_constraint< var, size_t >(
 					std::vector< var >( { O, R } ),
-					[&]( const std::vector< std::reference_wrapper< const boost::any > > & ass )
-					{ return ( any_cast< size_t >( ass[0] ) * 2 - any_cast< size_t >( ass[1] ) ) % 10 == 0; } ) );
+					[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
+					{ return ( ass[0] * 2 - ass[1] ) % 10 == 0; } ) );
 	con.push_back(
-				make_constraint(
+				make_constraint< var, size_t >(
 					std::vector< var >( { C1, W, U, C2 } ),
-					[&]( const std::vector< std::reference_wrapper< const boost::any > > & ass )
-					{
-						return
-								any_cast< size_t >( ass[0] ) + any_cast< size_t >( ass[1] ) * 2 ==
-								any_cast< size_t >( ass[2] ) + 10 * any_cast< size_t >( ass[3] );
-					} ) );
+					[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
+					{ return ass[0] + ass[1] * 2 == ass[2] + 10 * ass[3]; } ) );
 	con.push_back(
-				make_constraint(
+				make_constraint< var, size_t >(
 					std::vector< var >( { C1, W, U } ),
-					[&]( const std::vector< std::reference_wrapper< const boost::any > > & ass )
-					{ return ( any_cast< size_t >( ass[0] ) + any_cast< size_t >( ass[1] ) * 2 - any_cast< size_t >( ass[2] ) ) % 10 == 0; } ) );
+					[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
+					{ return ( ass[0] + ass[1] * 2 - ass[2] ) % 10 == 0; } ) );
 	con.push_back(
-				make_constraint(
+				make_constraint< var, size_t >(
 					std::vector< var >( { C2, T, O, C3 } ),
-					[&]( const std::vector< std::reference_wrapper< const boost::any > > & ass )
-					{
-						return
-								any_cast< size_t >( ass[0] ) + any_cast< size_t >( ass[1] ) * 2 ==
-								any_cast< size_t >( ass[2] ) + 10 * any_cast< size_t >( ass[3] );
-					} ) );
+					[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
+					{ return ass[0] + ass[1] * 2 == ass[2] + 10 * ass[3]; } ) );
 	con.push_back(
-				make_constraint(
+				make_constraint< var, size_t >(
 					std::vector< var >( { C2, T, O } ),
-					[&]( const std::vector< std::reference_wrapper< const boost::any > > & ass )
-					{ return ( any_cast< size_t >( ass[0] ) + any_cast< size_t >( ass[1] ) * 2 - any_cast< size_t >( ass[2] ) ) % 10 == 0; } ) );
+					[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
+					{ return ( ass[0] + ass[1] * 2 - ass[2] ) % 10 == 0; } ) );
 	con.push_back(
-				make_constraint(
+				make_constraint< var, size_t >(
 					std::vector< var >( { C3, F } ),
-					[&]( const std::vector< std::reference_wrapper< const boost::any > > & ass )
-					{ return any_cast< size_t >( ass[0] ) == any_cast< size_t >( ass[1] ); } ) );
+					[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
+					{ return ass[0] == ass[1]; } ) );
 	con.push_back(
-				make_constraint(
+				make_constraint< var, size_t >(
 					std::vector< var >( { F } ),
-					[&]( const std::vector< std::reference_wrapper< const boost::any > > & ass )
-					{ return any_cast< size_t >( ass[0] ) != 0; } ) );
+					[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
+					{ return ass[0] != 0; } ) );
 	for ( var i : { F, T, U, W, R, O } )
 	{
 		for ( var j : { F, T, U, W, R, O } )
@@ -290,18 +276,20 @@ BOOST_AUTO_TEST_CASE( CSP )
 			if ( i > j )
 			{
 				con.push_back(
-							make_constraint(
+							make_constraint< var, size_t >(
 								std::vector< var >( { i, j } ),
-								[&]( const std::vector< std::reference_wrapper< const boost::any > > & ass )
-								{ return any_cast< size_t >( ass[0] ) != any_cast< size_t >( ass[1] ); } ) );
+								[&]( const std::vector< std::reference_wrapper< const size_t > > & ass )
+								{ return ass[0] != ass[1]; } ) );
 			}
 		}
 	}
-	backtracking_search( std::map< var, std::list< boost::any > >(
-	{ {F, digits},{O, digits},{U, digits},{R, digits},{T, digits},{W, digits},{C1, carry},{C2, carry},{C3, carry} } ),
-						 4, con.begin( ), con.end( ), std::back_inserter( result ) );
+	backtracking_search(
+				std::map< var, std::list< size_t > >( { {F, digits},{O, digits},{U, digits},{R, digits},{T, digits},{W, digits},{C1, carry},{C2, carry},{C3, carry} } ),
+				4,
+				con,
+				std::back_inserter( result ) );
 	BOOST_CHECK_EQUAL( result.size( ), 7 );
-	for ( const std::map< var, boost::any > & ass : result )
+	for ( const std::map< var, size_t > & ass : result )
 	{
 		for ( const auto & c : con )
 		{ BOOST_CHECK( c( ass ) ); }
