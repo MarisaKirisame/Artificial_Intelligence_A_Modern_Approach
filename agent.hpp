@@ -132,17 +132,17 @@ struct online_DFS_agent
 						s,
 						[&]( const STATE & state, auto it )
 						{
-						assert( map.count( state ) != 0 );
-						std::map< ACTION, STATE > & m = map.find( state )->second;
-						auto tran = [](const std::pair< ACTION, STATE > & p){ return p.first; };
-						std::copy( boost::make_transform_iterator( map.begin( ), tran ), boost::make_transform_iterator( map.begin( ), tran ), it );
+							assert( map.count( state ) != 0 );
+							std::map< ACTION, STATE > & m = map.find( state )->second;
+							auto tran = [](const std::pair< ACTION, STATE > & p){ return p.first; };
+							std::copy( boost::make_transform_iterator( map.begin( ), tran ), boost::make_transform_iterator( map.begin( ), tran ), it );
 						},
 						[&]( const STATE & state, const ACTION & action )
 						{
-						assert( map.count( state ) != 0 );
-						std::map< ACTION, STATE > & m = map.find( state )->second;
-						assert( m.count( action ) != 0 );
-						return m.find( action )->second;
+							assert( map.count( state ) != 0 );
+							std::map< ACTION, STATE > & m = map.find( state )->second;
+							assert( m.count( action ) != 0 );
+							return m.find( action )->second;
 						},
 						[&](const STATE & st){ return untried.count( st ) != 0; },
 						std::back_inserter( vec ) );
