@@ -18,21 +18,21 @@ struct table_driven_agent
 	}
 
 	template< typename IT, typename ON_COLLID >
-	void add_entry( IT begin, IT end, ON_COLLID handler )
-	{
-		while ( begin != end )
+		void add_entry( IT begin, IT end, ON_COLLID handler )
 		{
-			auto res = map.insert( * begin );
-			if ( ! res.second ) { handler( * begin, res.first->second ); }
-			++begin;
+			while ( begin != end )
+			{
+				auto res = map.insert( * begin );
+				if ( ! res.second ) { handler( * begin, res.first->second ); }
+				++begin;
+			}
 		}
-	}
 
 	template< typename IT >
-	void add_entry( IT begin, IT end ) { map.insert( begin, end ); }
+		void add_entry( IT begin, IT end ) { map.insert( begin, end ); }
 
 	template< typename IT >
-	void remove_entry( IT begin, IT end ) { map.erase( begin, end ); }
+		void remove_entry( IT begin, IT end ) { map.erase( begin, end ); }
 };
 
 template< typename STATE, typename ACTION, typename PRIOREITY_TYPE = std::size_t >
@@ -58,21 +58,21 @@ struct simple_reflex_agent
 		return boost::optional< ACTION >( );
 	}
 	template< typename IT, typename ON_COLLID >
-	void add_entry( IT begin, IT end, ON_COLLID handler )
-	{
-		while ( begin != end )
+		void add_entry( IT begin, IT end, ON_COLLID handler )
 		{
-			auto res = map.insert( * begin );
-			if ( ! res.second ) { handler( * begin, res.first->second ); }
-			++begin;
+			while ( begin != end )
+			{
+				auto res = map.insert( * begin );
+				if ( ! res.second ) { handler( * begin, res.first->second ); }
+				++begin;
+			}
 		}
-	}
 
 	template< typename IT >
-	void add_entry( IT begin, IT end ) { map.insert( begin, end ); }
+		void add_entry( IT begin, IT end ) { map.insert( begin, end ); }
 
 	template< typename IT >
-	void remove_entry( IT begin, IT end ) { map.erase( begin, end ); }
+		void remove_entry( IT begin, IT end ) { map.erase( begin, end ); }
 
 };
 
@@ -129,23 +129,23 @@ struct online_DFS_agent
 			{
 				std::vector< ACTION > vec;
 				depth_first_search(
-							s,
-							[&]( const STATE & state, auto it )
-							{
-								assert( map.count( state ) != 0 );
-								std::map< ACTION, STATE > & m = map.find( state )->second;
-								auto tran = [](const std::pair< ACTION, STATE > & p){ return p.first; };
-								std::copy( boost::make_transform_iterator( map.begin( ), tran ), boost::make_transform_iterator( map.begin( ), tran ), it );
-							},
-							[&]( const STATE & state, const ACTION & action )
-							{
-								assert( map.count( state ) != 0 );
-								std::map< ACTION, STATE > & m = map.find( state )->second;
-								assert( m.count( action ) != 0 );
-								return m.find( action )->second;
-							},
-							[&](const STATE & st){ return untried.count( st ) != 0; },
-							std::back_inserter( vec ) );
+						s,
+						[&]( const STATE & state, auto it )
+						{
+						assert( map.count( state ) != 0 );
+						std::map< ACTION, STATE > & m = map.find( state )->second;
+						auto tran = [](const std::pair< ACTION, STATE > & p){ return p.first; };
+						std::copy( boost::make_transform_iterator( map.begin( ), tran ), boost::make_transform_iterator( map.begin( ), tran ), it );
+						},
+						[&]( const STATE & state, const ACTION & action )
+						{
+						assert( map.count( state ) != 0 );
+						std::map< ACTION, STATE > & m = map.find( state )->second;
+						assert( m.count( action ) != 0 );
+						return m.find( action )->second;
+						},
+						[&](const STATE & st){ return untried.count( st ) != 0; },
+						std::back_inserter( vec ) );
 				for ( const ACTION & a : vec ) { state = ns( state, a ); }
 			}
 		}
