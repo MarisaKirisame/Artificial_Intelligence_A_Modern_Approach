@@ -18,7 +18,7 @@
 #include <boost/iterator/transform_iterator.hpp>
 #include <random>
 #include <tuple>
-	template< typename STATE, typename EXPAND, typename RETURN_IF, typename OUTITER >
+template< typename STATE, typename EXPAND, typename RETURN_IF, typename OUTITER >
 OUTITER breadth_first_search( const STATE & inital_state, EXPAND f1, RETURN_IF f2, OUTITER result )
 {
 	size_t inital_depth = 0;
@@ -39,7 +39,7 @@ OUTITER breadth_first_search( const STATE & inital_state, EXPAND f1, RETURN_IF f
 			result );
 }
 
-	template< typename STATE, typename COST, typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename OUTITER >
+template< typename STATE, typename COST, typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename OUTITER >
 OUTITER uniform_cost_search(
 		const STATE & inital_state,
 		const COST & inital_cost,
@@ -49,7 +49,7 @@ OUTITER uniform_cost_search(
 		OUTITER result )
 { return best_first_search( inital_state, inital_cost, f1, f2, [](const STATE &, const COST & s){return s;}, f3, result ); }
 
-	template< typename STATE, typename COST, typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename EVAL_FUNC, typename OUTITER >
+template< typename STATE, typename COST, typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename EVAL_FUNC, typename OUTITER >
 OUTITER best_first_search(
 		const STATE & inital_state,
 		const COST & inital_cost,
@@ -360,7 +360,7 @@ OUTITER depth_first_search(
 		OUTITER result )
 { return depth_first_search( inital_state, postive_infinity( ), f1, f2, f3, result ); }
 
-	template< typename STATE, typename NUM, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename OUTITER >
+template< typename STATE, typename NUM, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename OUTITER >
 OUTITER depth_first_search(
 		const STATE & inital_state,
 		const NUM & depth,
@@ -373,7 +373,7 @@ OUTITER depth_first_search(
 	return depth_first_search( inital_state, depth, history, f1, f2, f3, result );
 }
 
-	template< typename STATE, typename NUM, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename OUTITER >
+template< typename STATE, typename NUM, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename OUTITER >
 OUTITER depth_first_search(
 		const STATE & inital_state,
 		const NUM & depth,
@@ -426,7 +426,7 @@ OUTITER depth_first_search(
 	return result;
 }
 
-	template< typename STATE, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename OUTITER >
+template< typename STATE, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename OUTITER >
 OUTITER iterative_deepening_depth_first_search( const STATE & inital_state,
 		ALL_ACTION f1,
 		NEXT_STATE f2,
@@ -866,15 +866,15 @@ boost::optional< std::map< STATE, ACTION > > and_or_search( const STATE & inital
 		f2( s, boost::make_function_output_iterator(
 					[&](const ACTION & act)
 					{
-					if ( ! ret )
-					{
-					history.insert( s );
-					std::vector< STATE > vec;
-					f3( s, act, std::back_inserter( vec ) );
-					ret = and_test( self, vec, history );
-					if ( ret ) { ret->insert( { s, act } ); }
-					history.erase( s );
-					}
+						if ( ! ret )
+						{
+							history.insert( s );
+							std::vector< STATE > vec;
+							f3( s, act, std::back_inserter( vec ) );
+							ret = and_test( self, vec, history );
+							if ( ret ) { ret->insert( { s, act } ); }
+							history.erase( s );
+						}
 					} ) );
 		return ret;
 	};

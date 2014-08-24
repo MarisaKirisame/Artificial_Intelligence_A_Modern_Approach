@@ -10,5 +10,6 @@ HEADERS += \
     agent.hpp \
     search.hpp \
     test.hpp \
-    CSP.hpp
+    CSP.hpp \
+    wumpus_world.hpp
 
