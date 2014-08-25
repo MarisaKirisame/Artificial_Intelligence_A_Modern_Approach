@@ -5,14 +5,16 @@
 #include <utility>
 #include <vector>
 #include <algorithm>
+#include "../propositional_calculus_prover/CNF.hpp"
 enum direction { north, east, south, west };
-enum action { turn_left, turn_right, move_forward, pickup_gold, shoot, climb };
 template< size_t x, size_t y >
 struct wumpus_world
 {
+	enum action { turn_left, turn_right, move_forward, pickup_gold, shoot, climb };
 	typedef std::pair< size_t, size_t > coordinate;
 	std::set< coordinate > pit;
 	coordinate gold;
+	struct sense { bool stench = false, breeze = false, glitter = false, bump = false, scream = false; };
 	struct
 	{
 		coordinate position;
@@ -20,11 +22,11 @@ struct wumpus_world
 		bool have_arrow;
 		bool carrying_gold;
 		bool out_of_cave;
+		sense current_sense;
 	} agent;
 	coordinate wumpus;
 	bool wumpus_killed;
 	coordinate exit;
-	struct sense { bool stench = false, breeze = false, glitter = false, bump = false, scream = false; };
 	bool meet_wumpus( ) const { return ( wumpus_killed == false && agent.position == wumpus ); }
 	bool fall_in_pit( ) const { return pit.count( agent.position ) != 0; }
 	bool is_end( ) const { return agent.out_of_cave || meet_wumpus( ) || fall_in_pit( ); }
@@ -68,9 +70,9 @@ struct wumpus_world
 	static int killed_reward( ) { return -1000; }
 	static int use_arrow_reward( ) { return -10; }
 	static int gold_reward( ) { return 1000; }
-	std::pair< int, sense > make_action( action act )
+	int make_action( action act )
 	{
-		std::pair< int, sense > ret( action_reward( ), sense( ) );
+		int ret = action_reward( );
 		switch ( act )
 		{
 		case turn_right:
@@ -110,28 +112,28 @@ struct wumpus_world
 			{
 			case north:
 				if ( agent.position.first < y - 1 ) { ++agent.position.first; }
-				else { ret.second.bump = true; }
+				else { agent.current_sense.bump = true; }
 				break;
 			case east:
 				if ( agent.position.first < x - 1 ) { ++agent.position.second; }
-				else { ret.second.bump = true; }
+				else { agent.current_sense.bump = true; }
 				break;
 			case south:
 				if ( agent.position.second > 0 ) { --agent.position.first; }
-				else { ret.second.bump = true; }
+				else { agent.current_sense.bump = true; }
 				break;
 			case west:
 				if ( agent.position.first > 0 ) { --agent.position.second; }
-				else { ret.second.bump = true; }
+				else { agent.current_sense.bump = true; }
 			}
-			if ( meet_wumpus( ) || fall_in_pit( ) ) { ret.first += killed_reward( ); }
+			if ( meet_wumpus( ) || fall_in_pit( ) ) { ret += killed_reward( ); }
 			break;
 		case pickup_gold:
 			if ( agent.position == gold ) { agent.carrying_gold = true; }
 			break;
 		case shoot:
 			if ( ! agent.have_arrow ) { break; }
-			ret.first += use_arrow_reward( );
+			ret += use_arrow_reward( );
 			agent.have_arrow = false;
 			coordinate arrow;
 			switch ( agent.facing )
@@ -167,22 +169,31 @@ struct wumpus_world
 			break;
 			http://marisa.moe
 			wumpus_killed = true;
-			ret.second.scream = true;
+			agent.current_sense.scream = true;
 			break;
 		case climb:
 			if ( agent.position == exit )
 			{
 				agent.out_of_cave = true;
-				if ( agent.carrying_gold ) { ret.first += gold_reward( ); }
+				if ( agent.carrying_gold ) { ret += gold_reward( ); }
 			}
 		}
-		if ( ! agent.carrying_gold && agent.position == gold ) { ret.second.glitter = true; }
+		if ( ! agent.carrying_gold && agent.position == gold ) { agent.current_sense.glitter = true; }
 		std::vector< coordinate > vec;
-		surronding_squares( std::inserter( vec ) );
-		if ( std::any_of( vec.begin( ), vec.end( ), []( const coordinate & c ){ return c == wumpus; } ) ) { ret.second.stench = true; }
-		if ( std::any_of( vec.begin( ), vec.end( ), []( const coordinate & c ){ return pit.count( vec ) != 0; } ) ) { ret.second.breeze = true; }
+		surronding_squares( std::back_inserter( vec ) );
+		if ( std::any_of( vec.begin( ), vec.end( ), [&]( const coordinate & c ){ return c == wumpus; } ) ) { agent.current_sense.stench = true; }
+		if ( std::any_of( vec.begin( ), vec.end( ), [&]( const coordinate & c ){ return pit.count( c ) != 0; } ) ) { agent.current_sense.breeze = true; }
 		return ret;
 	}
+};
+
+template< size_t x, size_t y >
+struct wumpus_agent
+{
+	typedef wumpus_world< x, y > world;
+	propositional_calculus::CNF knoweldge_base;
+	const world & env;
+	typename world::action operator( )( const typename world::sense & ) { }
 };
 
 #endif // WUMPUS_WORLD_HPP

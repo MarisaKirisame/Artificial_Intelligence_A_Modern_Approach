@@ -8,7 +8,7 @@
 #include "agent.hpp"
 #include "CSP.hpp"
 #include "search.hpp"
-
+#include "wumpus_world.hpp"
 enum location
 {
 	Sibiu, Fagaras, Bucharest, Pitesti, Rimnicu_Vilcea,
@@ -162,7 +162,7 @@ BOOST_TEST_DONT_PRINT_LOG_VALUE( ignore1 );
 BOOST_AUTO_TEST_CASE( AOS )
 {
 	std::list< action > act{ left, right, suck };
-	auto possibility = []( const vacum_world & v, action a, auto it)
+	auto possibility = [&]( const vacum_world & v, action a, auto it)
 	{
 		std::vector< vacum_world > vec;
 		switch ( a )
