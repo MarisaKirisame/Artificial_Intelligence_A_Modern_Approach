@@ -26,8 +26,9 @@ struct wumpus_world
 	} agent;
 	coordinate wumpus;
 	bool wumpus_killed;
-	coordinate exit;
-	bool meet_wumpus( ) const { return ( wumpus_killed == false && agent.position == wumpus ); }
+	static coordinate exit( ) { return coordinate( 0, 0 ); }
+	bool have_wumpus( const coordinate & c ) { return wumpus_killed == false && c == wumpus; }
+	bool meet_wumpus( ) const { return have_wumpus( agent.position ); }
 	bool fall_in_pit( ) const { return pit.count( agent.position ) != 0; }
 	bool is_end( ) const { return agent.out_of_cave || meet_wumpus( ) || fall_in_pit( ); }
 	template< typename OUTITER >
@@ -70,8 +71,18 @@ struct wumpus_world
 	static int killed_reward( ) { return -1000; }
 	static int use_arrow_reward( ) { return -10; }
 	static int gold_reward( ) { return 1000; }
+	void update_breeze_glitter_stench( )
+	{
+		if ( ! agent.carrying_gold && agent.position == gold ) { agent.current_sense.glitter = true; }
+		std::vector< coordinate > vec;
+		surronding_squares( std::back_inserter( vec ) );
+		if ( std::any_of( vec.begin( ), vec.end( ), [&]( const coordinate & c ){ return have_wumpus( c ); } ) ) { agent.current_sense.stench = true; }
+		if ( std::any_of( vec.begin( ), vec.end( ), [&]( const coordinate & c ){ return pit.count( c ) != 0; } ) ) { agent.current_sense.breeze = true; }
+	}
 	int make_action( action act )
 	{
+		assert( ! is_end( ) );
+		agent.current_sense = sense( );
 		int ret = action_reward( );
 		switch ( act )
 		{
@@ -172,17 +183,13 @@ struct wumpus_world
 			agent.current_sense.scream = true;
 			break;
 		case climb:
-			if ( agent.position == exit )
+			if ( agent.position == exit( ) )
 			{
 				agent.out_of_cave = true;
 				if ( agent.carrying_gold ) { ret += gold_reward( ); }
 			}
 		}
-		if ( ! agent.carrying_gold && agent.position == gold ) { agent.current_sense.glitter = true; }
-		std::vector< coordinate > vec;
-		surronding_squares( std::back_inserter( vec ) );
-		if ( std::any_of( vec.begin( ), vec.end( ), [&]( const coordinate & c ){ return c == wumpus; } ) ) { agent.current_sense.stench = true; }
-		if ( std::any_of( vec.begin( ), vec.end( ), [&]( const coordinate & c ){ return pit.count( c ) != 0; } ) ) { agent.current_sense.breeze = true; }
+		update_breeze_glitter_stench( );
 		return ret;
 	}
 };
@@ -193,7 +200,62 @@ struct wumpus_agent
 	typedef wumpus_world< x, y > world;
 	propositional_calculus::CNF knoweldge_base;
 	const world & env;
-	typename world::action operator( )( const typename world::sense & ) { }
+	typename world::action operator( )( )
+	{
+		knoweldge_base.data.insert( { literal( gold( ), env.agent.current_sense.glitter ) } );
+
+	}
+	size_t current_time;
+	typedef propositional_calculus::clause clause;
+	typedef propositional_calculus::literal literal;
+	typedef typename world::coordinate coordinate;
+	std::string square( const coordinate & c ) const { return std::to_string( c.first ) + "," + std::to_string( c.second ); }
+	std::string time( ) const { return std::string( current_time ); }
+	std::string square_time( const coordinate & c ) const { return square( c ) + "," + time( ); }
+	std::string pit( const coordinate & c ) const { return "P" + square( c ); }
+	std::string gold( const coordinate & c ) const { return "G" + square_time( c ); }
+	std::string wumpus( const coordinate & c ) const { return "W" + square_time( c ); }
+	std::string arrow( ) const { return "A" + time( ); }
+	wumpus_agent( const world & w ) : env( w ), current_time( 0 )
+	{
+		assert( w.is_end( ) == false );
+		auto have_unique =
+				[&]( const auto & make )
+		{
+			{
+				std::set< literal > tem;
+				for ( size_t i = 0; i < x; ++i )
+				{
+					for ( size_t j = 0; j < y; ++j )
+					{ tem.insert( literal( make( typename world::coordinate( i, j ) ), true ) ); }
+				}
+				knoweldge_base.data.insert( clause( std::move( tem ) ) );
+			}
+			{
+				for ( size_t i = 0; i < x; ++i )
+				{
+					for ( size_t j = 0; j < y; ++j )
+					{
+						for ( size_t k = i; k < x; ++k )
+						{
+							for ( size_t l = ( k == i ) ? ( j + 1 ) : 0; l < 0; ++l )
+							{
+								std::set< literal > tem;
+								tem.insert( literal( make( i, j ), false ) );
+								tem.insert( literal( make( k, l ), false ) );
+								knoweldge_base.data.insert( clause( std::move( tem ) ) );
+							}
+						}
+					}
+				}
+			}
+		};
+		have_unique( [this]( const typename world::coordinate & c ){ return gold( c ); } );
+		have_unique( [this]( const typename world::coordinate & c ){ return wumpus( c ); } );
+		knoweldge_base.data.insert( { literal( wumpus( w.agent.position ), false ) } );
+		knoweldge_base.data.insert( { literal( pit( w.agent.position ), false ) } );
+		knoweldge_base.data.insert( { literal( arrow( ), true ) } );
+	}
 };
 
 #endif // WUMPUS_WORLD_HPP
