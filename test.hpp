@@ -70,6 +70,7 @@ BOOST_AUTO_TEST_CASE( BFS_TEST )
 							boost::make_transform_iterator( tem.second, sf ),
 							it );
 			},
+			[](location, location ret){return ret;},
 			[](location l){ return l == Bucharest; },
 			std::back_inserter( res ) );
 	BOOST_CHECK_EQUAL( res, std::list< location >( { Sibiu, Fagaras, Bucharest } ) );
@@ -156,18 +157,18 @@ struct vacum_world
 	vacum_world( bool i, bool l, bool r ) : is_left( i ), left_clean( l ), right_clean( r ) { }
 	bool operator < ( const vacum_world & comp ) const { return std::tie( is_left, left_clean, right_clean ) < std::tie( comp.is_left, comp.left_clean, comp.right_clean ); }
 };
-enum action { left, right, suck };
-typedef std::map< vacum_world, action > ignore1;
+enum class vacum_action { left, right, suck };
+typedef std::map< vacum_world, vacum_action > ignore1;
 BOOST_TEST_DONT_PRINT_LOG_VALUE( ignore1 );
 BOOST_AUTO_TEST_CASE( AOS )
 {
-	std::list< action > act{ left, right, suck };
-	auto possibility = [&]( const vacum_world & v, action a, auto it)
+	std::list< vacum_action > act{ vacum_action::left, vacum_action::right, vacum_action::suck };
+	auto possibility = [&]( const vacum_world & v, vacum_action a, auto it)
 	{
 		std::vector< vacum_world > vec;
 		switch ( a )
 		{
-			case left:
+			case vacum_action::left:
 			vec.push_back( v );
 			{
 				vacum_world n( v );
@@ -175,7 +176,7 @@ BOOST_AUTO_TEST_CASE( AOS )
 				vec.push_back( n );
 			}
 			break;
-			case right:
+			case vacum_action::right:
 			vec.push_back( v );
 			{
 				vacum_world n( v );
@@ -183,7 +184,7 @@ BOOST_AUTO_TEST_CASE( AOS )
 				vec.push_back( n );
 			}
 			break;
-			case suck:
+			case vacum_action::suck:
 			{
 				vacum_world n( v );
 				( n.is_left ? n.left_clean : n.right_clean ) = true;
@@ -194,13 +195,13 @@ BOOST_AUTO_TEST_CASE( AOS )
 		std::copy( vec.begin( ), vec.end( ), it );
 	};
 	auto cleaned = [](const vacum_world & v){return v.left_clean && v.right_clean; };
-	auto res = and_or_search< action >(
+	auto res = and_or_search< vacum_action >(
 			vacum_world( true, false, false ),
 			cleaned,
 			[&](const vacum_world &, auto it){std::copy( act.begin( ), act.end( ), it );},
 			possibility );
 	BOOST_CHECK( res );
-	table_driven_agent< vacum_world, action > cleaner( * res );
+	table_driven_agent< vacum_world, vacum_action > cleaner( * res );
 	auto test = [&](const auto & self,const vacum_world & v, std::set< vacum_world > & history)
 	{
 		if ( cleaned( v ) ) { return true; }
@@ -301,7 +302,15 @@ BOOST_AUTO_TEST_CASE( CSP )
 BOOST_AUTO_TEST_CASE( ISSUE_2 )
 {
 	std::vector< size_t > res;
-	breadth_first_search( 0, [](size_t i, auto it){ * it = ( i + 1 ) % 7;++it; }, [](size_t i){ return i == 42; }, std::back_inserter( res ) );
+	breadth_first_search( 0, [](size_t i, auto it){ * it = ( i + 1 ) % 7;++it; },[](size_t, size_t ret){ return ret; }, [](size_t i){ return i == 42; }, std::back_inserter( res ) );
 	BOOST_CHECK( res.empty( ) );
 }
+
+BOOST_AUTO_TEST_CASE( INFERENCE_AGENT )
+{
+	wumpus_world< 4, 4 > ww( coordinate( 0, 0 ), east, coordinate( 0, 2 ), coordinate( 1, 2 ), { coordinate( 2, 0 ), coordinate( 2, 2 ), coordinate( 3, 3 ) } );
+	wumpus_agent< 4, 4 > agent( ww );
+	agent( );
+}
+
 #endif // TEST_HPP
