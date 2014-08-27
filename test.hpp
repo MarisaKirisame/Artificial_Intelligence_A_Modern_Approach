@@ -298,4 +298,10 @@ BOOST_AUTO_TEST_CASE( CSP )
 	}
 }
 
+BOOST_AUTO_TEST_CASE( ISSUE_2 )
+{
+	std::vector< size_t > res;
+	breadth_first_search( 0, [](size_t i, auto it){ * it = ( i + 1 ) % 7;++it; }, [](size_t i){ return i == 42; }, std::back_inserter( res ) );
+	BOOST_CHECK( res.empty( ) );
+}
 #endif // TEST_HPP
