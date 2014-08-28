@@ -224,7 +224,7 @@ struct wumpus_agent
 	typedef wumpus_world< x, y > world;
 	knoweldge_base kb;
 	const world & env;
-	typedef propositional_calculus::proposition propsition;
+	typedef propositional_calculus::proposition proposition;
 	typedef typename world::action action;
 	std::set< coordinate > un_visited;
 	std::list< action > plan;
@@ -246,7 +246,7 @@ struct wumpus_agent
 			for ( size_t i = 0; i < x; ++i )
 			{
 				for ( size_t j = 0; j < y; ++j )
-				{ kb.insert( propositional_calculus::make_iff( propsition( wumpus( coordinate( i, j ) ) ), propsition( old_wumpus( coordinate( i, j ) ) ) ) ); }
+				{ kb.insert( propositional_calculus::make_iff( proposition( wumpus( coordinate( i, j ) ) ), proposition( old_wumpus( coordinate( i, j ) ) ) ) ); }
 			}
 		}
 		if ( env.agent.current_sense.breeze )
@@ -295,7 +295,7 @@ struct wumpus_agent
 				[&]( auto allow_enter )
 				{
 					return
-							[&]( std::pair< coordinate, direction > s, action act )
+							[&,allow_enter]( std::pair< coordinate, direction > s, action act )
 							{
 								if ( act == world::turn_left ) { s.second = left( s.second ); }
 								else if ( act == world::turn_right ) { s.second = right( s.second ); }
@@ -422,7 +422,7 @@ struct wumpus_agent
 				for ( size_t i = 0; i < x; ++i )
 				{
 					for ( size_t j = 0; j < y; ++j )
-					{ tem.insert( literal( make( coordinate( i, j ) ), true ) ); }
+					{ tem.insert( literal( make( coordinate( i, j ) ), false ) ); }
 				}
 				kb.insert( clause( std::move( tem ) ) );
 			}
@@ -436,8 +436,8 @@ struct wumpus_agent
 							for ( size_t l = ( k == i ) ? ( j + 1 ) : 0; l < 0; ++l )
 							{
 								std::set< literal > tem;
-								tem.insert( literal( make( coordinate( i, j ) ), false ) );
-								tem.insert( literal( make( coordinate( k, l ) ), false ) );
+								tem.insert( literal( make( coordinate( i, j ) ), true ) );
+								tem.insert( literal( make( coordinate( k, l ) ), true ) );
 								kb.insert( clause( std::move( tem ) ) );
 							}
 						}
