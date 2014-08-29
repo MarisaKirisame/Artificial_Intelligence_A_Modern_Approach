@@ -111,7 +111,7 @@ OUTITER best_first_search(
 					std::list< STATE > history = current_element.history;
 					history.push_back( st );
 					auto func =
-							[&,current_element]( )
+							[&,current_element,e]( )
 							{
 								current_element.dump( );
 								*result = e.first;

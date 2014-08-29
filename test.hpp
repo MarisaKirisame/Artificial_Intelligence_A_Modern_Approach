@@ -73,7 +73,7 @@ BOOST_AUTO_TEST_CASE( BFS_TEST )
 			[](location, location ret){return ret;},
 			[](location l){ return l == Bucharest; },
 			std::back_inserter( res ) );
-	BOOST_CHECK_EQUAL( res, std::list< location >( { Sibiu, Fagaras, Bucharest } ) );
+	BOOST_CHECK_EQUAL( res, std::list< location >( { Fagaras, Bucharest } ) );
 }
 
 BOOST_AUTO_TEST_CASE( UCS_TEST )
@@ -308,9 +308,15 @@ BOOST_AUTO_TEST_CASE( ISSUE_2 )
 
 BOOST_AUTO_TEST_CASE( INFERENCE_AGENT )
 {
-	wumpus_world< 4, 4 > ww( coordinate( 0, 0 ), east, coordinate( 0, 2 ), coordinate( 1, 2 ), { coordinate( 2, 0 ), coordinate( 2, 2 ), coordinate( 3, 3 ) } );
+	wumpus_world< 4, 4 > ww( coordinate( 0, 0 ), east, coordinate( 2, 0 ), coordinate( 2, 1 ), { coordinate( 0, 2 ), coordinate( 2, 2 ), coordinate( 3, 3 ) } );
 	wumpus_agent< 4, 4 > agent( ww );
-	agent( );
+	int score = 0;
+	while ( ! ww.is_end( ) )
+	{
+		auto act = agent( );
+		score += ww.make_action( act );
+	}
+	BOOST_CHECK_GT( score, 0 );
 }
 
 #endif // TEST_HPP
