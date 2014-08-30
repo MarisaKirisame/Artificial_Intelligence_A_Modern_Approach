@@ -19,13 +19,13 @@ direction left( direction d )
 	switch ( d )
 	{
 	case north:
-		return east;
-	case east:
-		return south;
-	case south:
 		return west;
-	case west:
+	case east:
 		return north;
+	case south:
+		return east;
+	case west:
+		return south;
 	}
 	throw std::invalid_argument( "unknown direction" );
 }
@@ -52,7 +52,7 @@ coordinate next_square( coordinate c, direction d )
 template< size_t x, size_t y >
 struct wumpus_world
 {
-	enum action { turn_left, turn_right, move_forward, pickup_gold, shoot, climb };
+	enum class action { turn_left, turn_right, move_forward, pickup_gold, shoot, climb };
 	std::set< coordinate > pit;
 	coordinate gold;
 	struct sense { bool stench = false, breeze = false, glitter = false, bump = false, scream = false; };
@@ -99,13 +99,13 @@ struct wumpus_world
 			out( );
 			--c.second;
 		}
-		if ( c.second > 0 )
+		if ( c.first > 0 )
 		{
 			--c.first;
 			out( );
 			++c.first;
 		}
-		if ( c.first > 0 )
+		if ( c.second > 0 )
 		{
 			--c.second;
 			out( );
@@ -132,13 +132,13 @@ struct wumpus_world
 		int ret = action_reward( );
 		switch ( act )
 		{
-		case turn_right:
+		case action::turn_right:
 			agent.facing = right( agent.facing );
 			break;
-		case turn_left:
+		case action::turn_left:
 			agent.facing = left( agent.facing );
 			break;
-		case move_forward:
+		case action::move_forward:
 		{
 			coordinate tem = next_square< x, y >( agent.position, agent.facing );
 			if ( tem == agent.position ) { agent.current_sense.bump = true; }
@@ -146,10 +146,10 @@ struct wumpus_world
 			if ( meet_wumpus( ) || fall_in_pit( ) ) { ret += killed_reward( ); }
 			break;
 		}
-		case pickup_gold:
+		case action::pickup_gold:
 			if ( agent.position == gold ) { agent.carrying_gold = true; }
 			break;
-		case shoot:
+		case action::shoot:
 		{
 			if ( ! agent.have_arrow ) { break; }
 			ret += use_arrow_reward( );
@@ -168,7 +168,7 @@ struct wumpus_world
 			}
 			break;
 		}
-		case climb:
+		case action::climb:
 			if ( agent.position == exit( ) )
 			{
 				agent.out_of_cave = true;
@@ -211,19 +211,7 @@ struct knoweldge_base
 		for ( const propositional_calculus::clause & c : cnf.data ) { data.data.erase( c ); }
 		return ! ret;
 	}
-	bool possible( const proposition & p )
-	{
-		CNF cnf( propositional_calculus::to_CNF( p ) );
-		for ( auto it = cnf.data.begin( ); it != cnf.data.end( ); )
-		{
-			auto ret = data.data.insert( * it );
-			if ( ! ret.second ) { it = cnf.data.erase( it ); }
-			else { ++it; }
-		}
-		bool ret = propositional_calculus::DPLL( data );
-		for ( const propositional_calculus::clause & c : cnf.data ) { data.data.erase( c ); }
-		return ret;
-	}
+	bool possible( const proposition & p ) { return ! certain( propositional_calculus::make_not( p ) ); }
 	knoweldge_base( ) : data( { } ) { }
 };
 
@@ -239,7 +227,7 @@ struct wumpus_agent
 	std::list< action > plan;
 	typename world::action operator( )( )
 	{
-		kb.insert( { literal( wumpus( env.agent.position ), false ) } );
+		if ( ! env.wumpus_killed ) { kb.insert( { literal( wumpus( env.agent.position ), false ) } ); }
 		kb.insert( { literal( pit( env.agent.position ), false ) } );
 		un_visited.erase( env.agent.position );
 		if ( env.agent.current_sense.breeze )
@@ -259,20 +247,24 @@ struct wumpus_agent
 			}
 			else { env.surronding_squares( boost::make_function_output_iterator( [&]( const coordinate & c ){ kb.insert( { literal( wumpus( c ), false ) } ); } ) ); }
 		}
-		if ( env.agent.current_sense.glitter ) { return world::pickup_gold; }
+		if ( env.agent.current_sense.glitter ) { return world::action::pickup_gold; }
 		std::set< coordinate > safe, possibly_safe, possible_wumpus;
 		for ( size_t i = 0; i < x; ++i )
 		{
 			for ( size_t j = 0; j < y; ++j )
 			{
-				if ( kb.certain( propositional_calculus::make_not( propositional_calculus::make_or( wumpus( coordinate( i, j ) ), pit( coordinate( i, j ) ) ) ) ) )
+				proposition safe_square =
+						env.wumpus_killed ?
+							propositional_calculus::make_not( pit( coordinate( i, j ) ) ) :
+							propositional_calculus::make_not( propositional_calculus::make_or( wumpus( coordinate( i, j ) ), pit( coordinate( i, j ) ) ) );
+				if ( kb.certain( safe_square ) )
 				{
 					safe.insert( coordinate( i, j ) );
 					possibly_safe.insert( coordinate( i, j ) );
 				}
-				if ( kb.possible( propositional_calculus::make_not( propositional_calculus::make_or( wumpus( coordinate( i, j ) ), pit( coordinate( i, j ) ) ) ) ) )
+				else if ( kb.possible( safe_square ) )
 				{ possibly_safe.insert( coordinate( i, j ) ); }
-				if ( kb.possible( wumpus( coordinate( i, j ) ) ) ) { possible_wumpus.insert( coordinate( i, j ) );  }
+				if ( ( ! env.wumpus_killed ) && kb.possible( wumpus( coordinate( i, j ) ) ) ) { possible_wumpus.insert( coordinate( i, j ) );  }
 			}
 		}
 		auto all_action =
@@ -280,9 +272,9 @@ struct wumpus_agent
 				{
 					assert( world::action_reward( ) <= 0 );
 					static std::vector< std::pair< action, int > > cop(
-						{ { world::move_forward, -world::action_reward( ) },
-						  { world::turn_left, -world::action_reward( ) },
-						  { world::turn_right, -world::action_reward( ) } } );
+						{ { world::action::move_forward, -world::action_reward( ) },
+						  { world::action::turn_left, -world::action_reward( ) },
+						  { world::action::turn_right, -world::action_reward( ) } } );
 					std::copy( cop.begin( ), cop.end( ), it );
 				};
 		auto next_state =
@@ -291,11 +283,11 @@ struct wumpus_agent
 					return
 							[&,allow_enter]( std::pair< coordinate, direction > s, action act )
 							{
-								if ( act == world::turn_left ) { s.second = left( s.second ); }
-								else if ( act == world::turn_right ) { s.second = right( s.second ); }
+								if ( act == world::action::turn_left ) { s.second = left( s.second ); }
+								else if ( act == world::action::turn_right ) { s.second = right( s.second ); }
 								else
 								{
-									assert( act == world::move_forward );
+									assert( act == world::action::move_forward );
 									if ( allow_enter( s.first ) ) { s.first = next_square< x, y >( s.first, s.second ); }
 								}
 								return s;
@@ -319,6 +311,7 @@ struct wumpus_agent
 						[&]( const decltype( path_finder ) & pf ) { return eval_distance( pf, env.exit( ) ); },
 						[&]( const decltype( path_finder ) & pf ) { return safe.count( pf.first ) != 0 && pf.first == env.exit( ); },
 						[](const size_t &){}, std::back_inserter( plan ) );
+					if ( ! plan.empty( ) ) { plan.push_back( world::action::climb ); }
 				};
 		if ( plan.empty( ) && env.agent.carrying_gold ) { look_for_exit( ); }
 		if ( plan.empty( ) )
@@ -341,7 +334,7 @@ struct wumpus_agent
 					[&]( const decltype( path_finder ) & pf ) { return safe.count( pf.first ) != 0 && un_visited.count( pf.first ) != 0; },
 					[](const size_t &){}, std::back_inserter( plan ) );
 		}
-		if ( plan.empty( ) && env.agent.have_arrow )
+		if ( plan.empty( ) && env.agent.have_arrow && ! env.wumpus_killed )
 		{
 			A_star( path_finder,
 					static_cast< size_t >( 0 ),
@@ -368,7 +361,7 @@ struct wumpus_agent
 								un_visited.count( next_square< x, y >( pf.first, pf.second ) ) != 0;
 					},
 					[](const size_t &){}, std::back_inserter( plan ) );
-			if ( ! plan.empty( ) ) { plan.push_back( world::shoot ); }
+			if ( ! plan.empty( ) ) { plan.push_back( world::action::shoot ); }
 		}
 		if ( plan.empty( ) )
 		{
