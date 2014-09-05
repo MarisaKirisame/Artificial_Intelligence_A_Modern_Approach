@@ -11,5 +11,6 @@ HEADERS += \
     search.hpp \
     test.hpp \
     CSP.hpp \
-    wumpus_world.hpp
+    wumpus_world.hpp \
+    scope.hpp
 

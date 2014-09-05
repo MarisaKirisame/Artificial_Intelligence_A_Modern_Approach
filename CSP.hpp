@@ -8,6 +8,7 @@
 #include <list>
 #include <boost/any.hpp>
 #include <boost/iterator/filter_iterator.hpp>
+#include "scope.hpp"
 template< typename VARIABLE_ID_T, typename VARIABLE_T >
 struct local_constraint
 {
@@ -192,27 +193,33 @@ OUTITER backtracking_search(
 	}
 	for ( const VARIABLE_T & t : next_element.second.first )
 	{
-		auto ret = partial_assignment.insert( std::make_pair( next_element.first, t ) );
-		assert( ret.second );
-		result = backtracking_search(
-					variable,
-					partial_assignment,
-					{ next_element.first },
-					generalized_arc_consistency_upperbound,
-					constraint_set,
-					result );
-		partial_assignment.erase( next_element.first );
-		if (
-				std::any_of(
-					constraint_set.begin( ),
-					constraint_set.end( ),
-					[&]( const local_constraint< VARIABLE_ID_T, VARIABLE_T > & con ) { return ! con( partial_assignment ); } ) )
+		auto s =
+			make_scope(
+				[&]( )
+				{
+					auto ret = partial_assignment.insert( std::make_pair( next_element.first, t ) );
+					assert( ret.second );
+				},
+				[&]( ){ partial_assignment.erase( next_element.first ); } );
+		{
+			result = backtracking_search(
+						variable,
+						partial_assignment,
+						{ next_element.first },
+						generalized_arc_consistency_upperbound,
+						constraint_set,
+						result );
+		}
+		if ( std::any_of(
+				constraint_set.begin( ),
+				constraint_set.end( ),
+				[&]( const local_constraint< VARIABLE_ID_T, VARIABLE_T > & con ) { return ! con( partial_assignment ); } ) )
 		{ return result; }
 	}
 	return result;
 }
 
-	template< typename VARIABLE_ID_T, typename VARIABLE_T, typename OUTITER >
+template< typename VARIABLE_ID_T, typename VARIABLE_T, typename OUTITER >
 OUTITER backtracking_search(
 		const std::map< VARIABLE_ID_T, std::list< VARIABLE_T > > & m,
 		size_t generalized_arc_consistency_upperbound,
