@@ -9,6 +9,7 @@
 #include <boost/any.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 #include "scope.hpp"
+#include <functional>
 template< typename VARIABLE_ID_T, typename VARIABLE_T >
 struct local_constraint
 {
