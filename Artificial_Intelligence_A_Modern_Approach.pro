@@ -14,3 +14,4 @@ HEADERS += \
     wumpus_world.hpp \
     scope.hpp
 
+PRECOMPILED_HEADER = $$HEADERS
