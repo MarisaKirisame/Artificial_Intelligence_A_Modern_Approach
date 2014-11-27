@@ -353,7 +353,7 @@ struct wumpus_agent
 						//We'll shoot in front of wumpus.
 						//Situation( namely, a resonalble heuristic ) will be much complicated if we allow shoot from distance.
 						//Also, an action does not cost much, and this example is not use to achive highest score,
-						//	only to demonstrate the use of propositional inference engine.
+                        //only to demonstrate the use of propositional inference engine.
 					},
 					[&]( const decltype( path_finder ) & pf )
 					{
@@ -416,7 +416,7 @@ struct wumpus_agent
 					{
 						for ( size_t k = i; k < x; ++k )
 						{
-							for ( size_t l = ( k == i ) ? ( j + 1 ) : 0; l < 0; ++l )
+                            for ( size_t l = ( k == i ) ? ( j + 1 ) : 0; l < y; ++l )
 							{
 								std::set< literal > tem;
 								tem.insert( literal( make( coordinate( i, j ) ), false ) );
