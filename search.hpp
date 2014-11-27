@@ -18,6 +18,7 @@
 #include <boost/iterator/transform_iterator.hpp>
 #include <random>
 #include <tuple>
+#include <scope.hpp>
 template< typename STATE, typename COST, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename COST_OUTPUT, typename EVAL_FUNC, typename OUTITER >
 OUTITER best_first_search(
         const STATE & inital_state,
@@ -879,7 +880,7 @@ boost::optional< std::map< STATE, ACTION > > and_or_search(
         }
         return dead_end ? faliure : boost::optional< std::map< STATE, ACTION > >( ret );
     };
-    auto or_test = [&]( const auto & self, const STATE & s, std::set< STATE > & history )
+    auto or_test = [&]( const auto & self, const STATE & s, std::set< STATE > & history ) -> boost::optional< std::map< STATE, ACTION > >
     {
         if ( f1( s ) ) { return boost::optional< std::map< STATE, ACTION > >( std::map< STATE, ACTION >( { } ) ); }
         boost::optional< std::map< STATE, ACTION > > ret;
@@ -888,13 +889,11 @@ boost::optional< std::map< STATE, ACTION > > and_or_search(
                     {
                         if ( ! ret )
                         {
-                            history.insert( s );
+                            auto g = make_scope( [&]( ){ history.insert( s ); }, [&]( ){ history.erase( s ); } );
                             std::vector< STATE > vec;
                             f3( s, act, std::back_inserter( vec ) );
-                            auto p = std::make_pair( s, act );
                             ret = and_test( self, vec, history );
-                            if ( ret ) { ret->insert( p ); }
-                            history.erase( s );
+                            if ( ret ) { ret->insert( std::make_pair( s, act ) ); }
                         }
                     } ) );
         return ret;
