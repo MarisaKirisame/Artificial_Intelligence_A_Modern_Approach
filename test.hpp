@@ -58,22 +58,22 @@ const std::multimap< location, std::pair< location, size_t > > & map( )
 BOOST_TEST_DONT_PRINT_LOG_VALUE( std::list< location > );
 BOOST_AUTO_TEST_CASE( BFS_TEST )
 {
-	auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp ){ return pp.second.first; };
-	std::list< location > res;
-	breadth_first_search(
-			Sibiu,
-			[&](location l, const auto & it)
-			{
-				auto tem = map( ).equal_range( l );
-				std::copy(
-							boost::make_transform_iterator( tem.first, sf ),
-							boost::make_transform_iterator( tem.second, sf ),
-							it );
-			},
-			[](location, location ret){return ret;},
-			[](location l){ return l == Bucharest; },
-			std::back_inserter( res ) );
-	BOOST_CHECK_EQUAL( res, std::list< location >( { Fagaras, Bucharest } ) );
+    auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp ){ return pp.second.first; };
+    std::list< location > res;
+    breadth_first_search< location >(
+        Sibiu,
+        [&](location l, const auto & it)
+        {
+            auto tem = map( ).equal_range( l );
+            std::copy(
+                boost::make_transform_iterator( tem.first, sf ),
+                boost::make_transform_iterator( tem.second, sf ),
+                it );
+        },
+        [](location, location ret){return ret;},
+        [](location l){ return l == Bucharest; },
+        std::back_inserter( res ) );
+        BOOST_CHECK_EQUAL( res, std::list< location >( { Fagaras, Bucharest } ) );
 }
 
 BOOST_AUTO_TEST_CASE( UCS_TEST )
@@ -481,7 +481,12 @@ BOOST_AUTO_TEST_CASE( CSP )
 BOOST_AUTO_TEST_CASE( ISSUE_2 )
 {
     std::vector< size_t > res;
-    breadth_first_search( 0, [](size_t i, auto it){ * it = ( i + 1 ) % 7;++it; },[](size_t, size_t ret){ return ret; }, [](size_t i){ return i == 42; }, std::back_inserter( res ) );
+    breadth_first_search< size_t >(
+        0,
+        [](size_t i, auto it) { * it = ( i + 1 ) % 7; ++it; },
+        [](size_t, size_t ret) { return ret; },
+        [](size_t i){ return i == 42; },
+        std::back_inserter( res ) );
     BOOST_CHECK( res.empty( ) );
 }
 

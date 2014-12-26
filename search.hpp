@@ -18,36 +18,50 @@
 #include <boost/iterator/transform_iterator.hpp>
 #include <random>
 #include <tuple>
-#include <scope.hpp>
-template< typename STATE, typename COST, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename COST_OUTPUT, typename EVAL_FUNC, typename OUTITER >
+#include "scope.hpp"
+template
+<
+    typename ACTION_TYPE,
+    typename STATE,
+    typename COST,
+    typename ALL_ACTION,
+    typename NEXT_STATE,
+    typename RETURN_IF,
+    typename COST_OUTPUT,
+    typename EVAL_FUNC,
+    typename OUTITER
+>
 OUTITER best_first_search(
         const STATE & inital_state,
         const COST & inital_cost,
-        ALL_ACTION f1,
-        NEXT_STATE f2,
-        RETURN_IF f3,
-        EVAL_FUNC f4,
-        COST_OUTPUT f5,
+        ALL_ACTION action,
+        NEXT_STATE next_state,
+        RETURN_IF return_if,
+        EVAL_FUNC eval_func,
+        COST_OUTPUT cost_output,
         OUTITER result )
 {
     struct state_tag { };
     struct eval_tag { };
     using namespace boost;
     using namespace multi_index;
-    typedef decltype( f4( std::declval< STATE >( ), std::declval< COST >( ) ) ) EVAL;
+    typedef decltype( eval_func( std::declval< STATE >( ), std::declval< COST >( ) ) ) EVAL;
     struct element
     {
         STATE state;
         COST cost;
         std::list< STATE > history;
         EVAL eval;
-        std::function< void( ) > dump;
-        element( const STATE & state, const COST & cost, const std::list< STATE > history, const EVAL & eval, const std::function< void( ) > & dump ) :
-            state( state ), cost( cost ), history( history ), eval( eval ), dump( dump ) { }
+        std::list< ACTION_TYPE > act;
+        element( const STATE & state, const COST & cost, std::list< STATE > && history, const EVAL & eval,
+                 std::list< ACTION_TYPE > && act ) :
+            state( state ), cost( cost ), history( std::move( history ) ), eval( eval ), act( std::move( act ) ) { }
     };
-    auto make_element = [&]( const STATE & state, const COST & cost, const std::list< STATE > & history, const std::function< void( ) > & dump )
-    { return element( state, cost, history, f4( state, cost ), dump ); };
-    auto update_element = [&]( element & e ){ e.eval = f4( e.state, e.cost ); };
+    auto make_element =
+            [&]( const STATE & state, const COST & cost, std::list< STATE > && history,
+                 std::list< ACTION_TYPE > && act )
+    { return element( state, cost, std::move( history ), eval_func( state, cost ), std::move( act ) ); };
+    auto update_element = [&]( element & e ){ e.eval = eval_func( e.state, e.cost ); };
     multi_index_container
     <
         element,
@@ -57,43 +71,39 @@ OUTITER best_first_search(
             ordered_non_unique< tag< eval_tag >, member< element, EVAL, & element::eval > >
         >
     > container;
-    container.insert( make_element( inital_state, inital_cost, { inital_state }, [](){} ) );
+    container.insert( make_element( inital_state, inital_cost, { inital_state }, { } ) );
     auto & goodness_index = container.template get< eval_tag >( );
     auto & state_index = container.template get< state_tag >( );
     while ( ! container.empty( ) )
     {
         auto iterator = goodness_index.begin( );
         const element & current_element = * iterator;
-        if ( f3( current_element.state ) )
+        if ( return_if( current_element.state ) )
         {
-            f5( current_element.cost );
-            current_element.dump( );
+            cost_output( current_element.cost );
+            std::copy( current_element.act.begin( ), current_element.act.end( ), result );
             return result;
         }
-        f1( current_element.state, boost::make_function_output_iterator(
-                [&]( const auto & e )
+        action( current_element.state, boost::make_function_output_iterator(
+                [&]( const std::pair< ACTION_TYPE, COST > & e )
                 {
-                    STATE st = f2( current_element.state, e.first );
+                    STATE st = next_state( current_element.state, e.first );
                     if ( std::count( current_element.history.begin( ), current_element.history.end( ), st ) != 0 ) { return; }
                     auto it = state_index.find( st );
                     COST cost = e.second + current_element.cost;
                     std::list< STATE > history = current_element.history;
                     history.push_back( st );
-                    auto func =
-                            [&,current_element,e]( )
-                            {
-                                current_element.dump( );
-                                *result = e.first;
-                                ++result;
-                            };
-                    if ( it == state_index.end( ) ) { state_index.insert( make_element( st, cost, std::move( history ), func ) ); }
+                    auto func = current_element.act;
+                    func.push_back( e.first );
+                    if ( it == state_index.end( ) )
+                    { state_index.insert( make_element( st, cost, std::move( history ), std::move( func ) ) ); }
                     else { state_index.modify( it, [&]( element & ee )
                     {
                         if ( ee.cost > cost )
                         {
                             ee.cost = cost;
                             ee.history = std::move( history );
-                            ee.dump = func;
+                            ee.act = std::move( func );
                             update_element( ee );
                         }
                     } ); }
@@ -103,22 +113,51 @@ OUTITER best_first_search(
     return result;
 }
 
-template< typename STATE, typename COST, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename COST_OUTPUT, typename OUTITER >
+template
+<
+    typename ACTION_TYPE,
+    typename STATE,
+    typename COST,
+    typename ALL_ACTION,
+    typename NEXT_STATE,
+    typename RETURN_IF,
+    typename COST_OUTPUT,
+    typename OUTITER
+>
 OUTITER uniform_cost_search(
-		const STATE & inital_state,
-		const COST & inital_cost,
-		ALL_ACTION f1,
-		NEXT_STATE f2,
-		RETURN_IF f3,
-		COST_OUTPUT f4,
-		OUTITER result )
-{ return best_first_search( inital_state, inital_cost, f1, f2, f3, [](const STATE &, const COST & s){return s;}, f4, result ); }
+        const STATE & inital_state,
+        const COST & inital_cost,
+        ALL_ACTION f1,
+        NEXT_STATE f2,
+        RETURN_IF f3,
+        COST_OUTPUT f4,
+        OUTITER result )
+{
+    return
+        best_first_search< ACTION_TYPE >(
+            inital_state,
+            inital_cost,
+            f1,
+            f2,
+            f3,
+            [](const STATE &, const COST & s){return s;},\
+            f4,
+            result );
+}
 
-template< typename STATE, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename OUTITER >
+template
+<
+    typename ACTION_TYPE,
+    typename STATE,
+    typename ALL_ACTION,
+    typename NEXT_STATE,
+    typename RETURN_IF,
+    typename OUTITER
+>
 OUTITER breadth_first_search( const STATE & inital_state, ALL_ACTION f1, NEXT_STATE f2, RETURN_IF f3, OUTITER result )
 {
     size_t inital_depth = 0;
-    return uniform_cost_search( inital_state,
+    return uniform_cost_search< ACTION_TYPE >( inital_state,
             inital_depth,
             [&]( const STATE & s, auto it )
             {
@@ -138,719 +177,756 @@ OUTITER breadth_first_search( const STATE & inital_state, ALL_ACTION f1, NEXT_ST
 
 template
 <
-	typename STATE, typename COST, typename EVAL,
-	typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename OUTITER
+    typename STATE, typename COST, typename EVAL,
+    typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename OUTITER
 >
 OUTITER recursive_uniform_cost_search(
-		const STATE & inital_state,
-		const COST & inital_cost,
-		const EVAL & eval_limit,
-		EXPAND f1,
-		RETURN_IF f2,
-		COST_OUTPUT f3,
-		OUTITER result )
+        const STATE & inital_state,
+        const COST & inital_cost,
+        const EVAL & eval_limit,
+        EXPAND f1,
+        RETURN_IF f2,
+        COST_OUTPUT f3,
+        OUTITER result )
 {
-	return recursive_best_first_search(
-			inital_state,
-			inital_cost,
-			boost::optional< EVAL >(),
-			eval_limit,
-			{},
-			f1,
-			f2,
-			[]( const STATE &, const COST & s ){ return s; },
-			f3,
-			[]( const EVAL & ){},
-			result );
+    return recursive_best_first_search(
+            inital_state,
+            inital_cost,
+            boost::optional< EVAL >(),
+            eval_limit,
+            {},
+            f1,
+            f2,
+            []( const STATE &, const COST & s ){ return s; },
+            f3,
+            []( const EVAL & ){},
+            result );
 }
 
 template
 <
-	typename STATE, typename COST, typename EVAL,
-	typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename SEARCH_EVAL_OUTPUT, typename EVAL_FUNC, typename OUTITER
+    typename STATE, typename COST, typename EVAL,
+    typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename SEARCH_EVAL_OUTPUT,
+    typename EVAL_FUNC, typename OUTITER
 >
 OUTITER recursive_best_first_search(
-		const STATE & inital_state,
-		const COST & inital_cost,
-		const boost::optional< EVAL > & init_eval,
-		const EVAL & eval_limit,
-		const std::set< STATE > & search_before,
-		EXPAND f1,
-		RETURN_IF f2,
-		EVAL_FUNC f3,
-		COST_OUTPUT f4,
-		SEARCH_EVAL_OUTPUT f5,
-		OUTITER result )
+        const STATE & inital_state,
+        const COST & inital_cost,
+        const boost::optional< EVAL > & init_eval,
+        const EVAL & eval_limit,
+        const std::set< STATE > & search_before,
+        EXPAND f1,
+        RETURN_IF f2,
+        EVAL_FUNC f3,
+        COST_OUTPUT f4,
+        SEARCH_EVAL_OUTPUT f5,
+        OUTITER result )
 {
-	EVAL inital_eval( f3( inital_state, inital_cost ) );
-	if ( inital_eval > eval_limit )
-	{
-		f5( inital_eval );
-		return result;
-	}
-	if ( f2( inital_state ) )
-	{
-		f4( inital_cost );
-		* result = inital_state;
-		++result;
-		return result;
-	}
-	std::set< STATE > param = search_before;
-	param.insert( inital_state );
-	struct state_tag { };
-	struct eval_tag { };
-	using namespace boost;
-	using namespace multi_index;
-	struct element
-	{
-		STATE state;
-		COST cost;
-		EVAL eval;
-		element( const STATE & state, const COST & cost, const EVAL & eval ) :
-			state( state ), cost( cost ), eval( eval ) { }
-	};
-	auto make_element = [&]( const STATE & state, const COST & cost )
-	{ return element( state, cost, init_eval ? std::max( f3( state, cost ), * init_eval ) : f3( state, cost ) ); };
-	multi_index_container
-		<
-		element,
-		indexed_by
-			<
-			ordered_unique< tag< state_tag >, member< element, STATE, & element::state > >,
-		ordered_non_unique< tag< eval_tag >, member< element, EVAL, & element::eval > >
-			>
-			> container;
+    EVAL inital_eval( f3( inital_state, inital_cost ) );
+    if ( inital_eval > eval_limit )
+    {
+        f5( inital_eval );
+        return result;
+    }
+    if ( f2( inital_state ) )
+    {
+        f4( inital_cost );
+        * result = inital_state;
+        ++result;
+        return result;
+    }
+    std::set< STATE > param = search_before;
+    param.insert( inital_state );
+    struct state_tag { };
+    struct eval_tag { };
+    using namespace boost;
+    using namespace multi_index;
+    struct element
+    {
+        STATE state;
+        COST cost;
+        EVAL eval;
+        element( const STATE & state, const COST & cost, const EVAL & eval ) :
+            state( state ), cost( cost ), eval( eval ) { }
+    };
+    auto make_element = [&]( const STATE & state, const COST & cost )
+    { return element( state, cost, init_eval ? std::max( f3( state, cost ), * init_eval ) : f3( state, cost ) ); };
+    multi_index_container
+        <
+        element,
+        indexed_by
+            <
+            ordered_unique< tag< state_tag >, member< element, STATE, & element::state > >,
+        ordered_non_unique< tag< eval_tag >, member< element, EVAL, & element::eval > >
+            >
+            > container;
     auto & goodness_index = container.template get< eval_tag >( );
-	f1(
-			inital_state,
-			boost::make_function_output_iterator(
-				[&]( const std::pair< STATE, COST > & p )
-				{
-					if ( search_before.count( p.first ) == 0 ) { container.insert( make_element( p.first, p.second + inital_cost ) ); }
-				} ) );
-	if ( container.empty( ) )
-	{
-		f5( eval_limit * 2 );
-		return result;
-	}
-	else if ( container.size( ) == 1 )
-	{
-		bool find_solution = false;
-		recursive_best_first_search(
-				container.begin( )->state,
-				inital_cost + container.begin( )->cost,
-				boost::optional< EVAL >( container.begin( )->eval ),
-				eval_limit,
-				param,
-				f1,
-				f2,
-				f3,
-				f4,
-				f5,
-				boost::make_function_output_iterator(
-					std::function< void ( const STATE & ) >(
-						[&]( const STATE & s )
-						{
-							if ( ! find_solution )
-							{
-								* result = inital_state;
-								++result;
-								find_solution = true;
-							}
-							* result = s;
-							++ result;
-						} ) ) );
-		return result;
-	}
-	while ( true )
-	{
-		auto iterator = goodness_index.begin( );
-		const element & current_element = * iterator;
-		++iterator;
-		const element & second_element = * iterator;
-		if ( current_element.eval > eval_limit )
-		{
-			f5( current_element.eval );
-			return result;
-		}
-		bool find_solution = false;
-		recursive_best_first_search(
-				current_element.state,
-				current_element.cost,
-				boost::optional< EVAL >( current_element.eval ),
-				std::min( eval_limit, second_element.eval ),
-				param,
-				f1,
-				f2,
-				f3,
-				f4,
-				std::function< void ( const EVAL & ) >(
-					[&](const EVAL & e)
-					{
-						goodness_index.modify( goodness_index.begin( ), [&](element & el){ el.eval = e; } );
-						f5( e );
-					} ),
-				boost::make_function_output_iterator(
-					std::function< void ( const STATE & ) >(
-						[&]( const STATE & s )
-						{
-							if ( ! find_solution )
-							{
-								* result = inital_state;
-								++result;
-								find_solution = true;
-							}
-							* result = s;
-							++ result;
-						} ) ) );
-		if ( find_solution ) { return result; }
-	}
-	return result;
+    f1(
+            inital_state,
+            boost::make_function_output_iterator(
+                [&]( const std::pair< STATE, COST > & p )
+                {
+                    if ( search_before.count( p.first ) == 0 ) { container.insert( make_element( p.first, p.second + inital_cost ) ); }
+                } ) );
+    if ( container.empty( ) )
+    {
+        f5( eval_limit * 2 );
+        return result;
+    }
+    else if ( container.size( ) == 1 )
+    {
+        bool find_solution = false;
+        recursive_best_first_search(
+                container.begin( )->state,
+                inital_cost + container.begin( )->cost,
+                boost::optional< EVAL >( container.begin( )->eval ),
+                eval_limit,
+                param,
+                f1,
+                f2,
+                f3,
+                f4,
+                f5,
+                boost::make_function_output_iterator(
+                    std::function< void ( const STATE & ) >(
+                        [&]( const STATE & s )
+                        {
+                            if ( ! find_solution )
+                            {
+                                * result = inital_state;
+                                ++result;
+                                find_solution = true;
+                            }
+                            * result = s;
+                            ++ result;
+                        } ) ) );
+        return result;
+    }
+    while ( true )
+    {
+        auto iterator = goodness_index.begin( );
+        const element & current_element = * iterator;
+        ++iterator;
+        const element & second_element = * iterator;
+        if ( current_element.eval > eval_limit )
+        {
+            f5( current_element.eval );
+            return result;
+        }
+        bool find_solution = false;
+        recursive_best_first_search(
+                current_element.state,
+                current_element.cost,
+                boost::optional< EVAL >( current_element.eval ),
+                std::min( eval_limit, second_element.eval ),
+                param,
+                f1,
+                f2,
+                f3,
+                f4,
+                std::function< void ( const EVAL & ) >(
+                    [&](const EVAL & e)
+                    {
+                        goodness_index.modify( goodness_index.begin( ), [&](element & el){ el.eval = e; } );
+                        f5( e );
+                    } ),
+                boost::make_function_output_iterator(
+                    std::function< void ( const STATE & ) >(
+                        [&]( const STATE & s )
+                        {
+                            if ( ! find_solution )
+                            {
+                                * result = inital_state;
+                                ++result;
+                                find_solution = true;
+                            }
+                            * result = s;
+                            ++ result;
+                        } ) ) );
+        if ( find_solution ) { return result; }
+    }
+    return result;
 }
 
 
 struct postive_infinity
 {
-	bool operator == ( const postive_infinity & ) { return true; }
-	template< typename T >
-	bool operator == ( const T & ) const { return false; }
-	template< typename T >
-	bool operator != ( const T & t ) const { return ! ( ( * this ) == t ); }
-	template< typename T >
-	bool operator < ( const T & ) const { return false; }
-	template< typename T >
-	bool operator >= ( const T & ) const { return true; }
-	template< typename T >
-	bool operator <= ( const T & t ) const { return ( * this ) == t; }
-	template< typename T >
-	bool operator > ( const T & t ) const { return ( * this ) != t; }
-	template< typename T >
-	postive_infinity operator + ( const T & ) const { return * this; }
-	template< typename T >
-	postive_infinity operator - ( const T & ) const { return * this; }
-	postive_infinity operator - ( const postive_infinity & ) const = delete;
-	template< typename T >
-	postive_infinity operator * ( const T & t ) const
-	{
-		assert( t > 0 );
-		return * this;
-	}
-	template< typename T >
-	postive_infinity operator / ( const T & t ) const
-	{
-		assert( t > 0 );
-		return * this;
-	}
-	template< typename T >
-	postive_infinity & operator += ( const T & t )
-	{
-		( * this ) = ( * this ) + t;
-		return * this;
-	}
-	template< typename T >
-	postive_infinity & operator -= ( const T & t )
-	{
-		( * this ) = ( * this ) - t;
-		return * this;
-	}
-	template< typename T >
-	postive_infinity & operator *= ( const T & t )
-	{
-		( * this ) = ( * this ) * t;
-		return * this;
-	}
-	template< typename T >
-	postive_infinity & operator /= ( const T & t )
-	{
-		( * this ) = ( * this ) / t;
-		return * this;
-	}
+    bool operator == ( const postive_infinity & ) { return true; }
+    template< typename T >
+    bool operator == ( const T & ) const { return false; }
+    template< typename T >
+    bool operator != ( const T & t ) const { return ! ( ( * this ) == t ); }
+    template< typename T >
+    bool operator < ( const T & ) const { return false; }
+    template< typename T >
+    bool operator >= ( const T & ) const { return true; }
+    template< typename T >
+    bool operator <= ( const T & t ) const { return ( * this ) == t; }
+    template< typename T >
+    bool operator > ( const T & t ) const { return ( * this ) != t; }
+    template< typename T >
+    postive_infinity operator + ( const T & ) const { return * this; }
+    template< typename T >
+    postive_infinity operator - ( const T & ) const { return * this; }
+    postive_infinity operator - ( const postive_infinity & ) const = delete;
+    template< typename T >
+    postive_infinity operator * ( const T & t ) const
+    {
+        assert( t > 0 );
+        return * this;
+    }
+    template< typename T >
+    postive_infinity operator / ( const T & t ) const
+    {
+        assert( t > 0 );
+        return * this;
+    }
+    template< typename T >
+    postive_infinity & operator += ( const T & t )
+    {
+        ( * this ) = ( * this ) + t;
+        return * this;
+    }
+    template< typename T >
+    postive_infinity & operator -= ( const T & t )
+    {
+        ( * this ) = ( * this ) - t;
+        return * this;
+    }
+    template< typename T >
+    postive_infinity & operator *= ( const T & t )
+    {
+        ( * this ) = ( * this ) * t;
+        return * this;
+    }
+    template< typename T >
+    postive_infinity & operator /= ( const T & t )
+    {
+        ( * this ) = ( * this ) / t;
+        return * this;
+    }
 };
 
 template< typename STATE, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename OUTITER >
 OUTITER depth_first_search(
-		const STATE & inital_state,
-		ALL_ACTION f1,
-		NEXT_STATE f2,
-		RETURN_IF f3,
-		OUTITER result )
+        const STATE & inital_state,
+        ALL_ACTION f1,
+        NEXT_STATE f2,
+        RETURN_IF f3,
+        OUTITER result )
 { return depth_first_search( inital_state, postive_infinity( ), f1, f2, f3, result ); }
 
 template< typename STATE, typename NUM, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename OUTITER >
 OUTITER depth_first_search(
-		const STATE & inital_state,
-		const NUM & depth,
-		ALL_ACTION f1,
-		NEXT_STATE f2,
-		RETURN_IF f3,
-		OUTITER result )
+        const STATE & inital_state,
+        const NUM & depth,
+        ALL_ACTION f1,
+        NEXT_STATE f2,
+        RETURN_IF f3,
+        OUTITER result )
 {
-	std::set< STATE > history = { inital_state };
-	return depth_first_search( inital_state, depth, history, f1, f2, f3, result );
+    std::set< STATE > history = { inital_state };
+    return depth_first_search( inital_state, depth, history, f1, f2, f3, result );
 }
 
 template< typename STATE, typename NUM, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename OUTITER >
 OUTITER depth_first_search(
-		const STATE & inital_state,
-		const NUM & depth,
-		std::set< STATE > & history,
-		ALL_ACTION f1,
-		NEXT_STATE f2,
-		RETURN_IF f3,
-		OUTITER result )
+        const STATE & inital_state,
+        const NUM & depth,
+        std::set< STATE > & history,
+        ALL_ACTION f1,
+        NEXT_STATE f2,
+        RETURN_IF f3,
+        OUTITER result )
 {
-	if ( f3( inital_state ) ) { return result; }
-	if ( depth < 1 ) { return result; }
-	auto new_depth = depth - 1;
-	std::vector< std::pair< STATE, std::function< void ( ) > > > vec;
-	f1( inital_state, boost::make_function_output_iterator(
-				[&](const auto & action)
-				{
-					vec.push_back(
-					std::make_pair(
-						f2( inital_state, action ),
-						[action,&result](){ * result = action; ++result; } ) );
-				} ) );
-	for ( const std::pair< STATE, std::function< void ( ) > > & s : vec )
-	{
-		if ( f3( s.first ) ) { s.second( ); return result; }
-		if ( history.count( s.first ) != 0 ) { continue; }
-		history.insert( s.first );
-		bool find_solution = false;
-		depth_first_search(
-				s.first,
-				new_depth,
-				history,
-				f1,
-				f2,
-				f3,
-				boost::make_function_output_iterator(
-					std::function< void( const STATE & ) >(
-						[&]( const auto & action )
-						{
-							if ( ! find_solution )
-							{
-								s.second( );
-								find_solution = true;
-							}
-							* result = action;
-							++result;
-						} ) ) );
-		if ( find_solution ) { return result; }
-		history.erase( s.first );
-	}
-	return result;
+    if ( f3( inital_state ) ) { return result; }
+    if ( depth < 1 ) { return result; }
+    auto new_depth = depth - 1;
+    std::vector< std::pair< STATE, std::function< void ( ) > > > vec;
+    f1( inital_state, boost::make_function_output_iterator(
+                [&](const auto & action)
+                {
+                    vec.push_back(
+                    std::make_pair(
+                        f2( inital_state, action ),
+                        [action,&result](){ * result = action; ++result; } ) );
+                } ) );
+    for ( const std::pair< STATE, std::function< void ( ) > > & s : vec )
+    {
+        if ( f3( s.first ) ) { s.second( ); return result; }
+        if ( history.count( s.first ) != 0 ) { continue; }
+        history.insert( s.first );
+        bool find_solution = false;
+        depth_first_search(
+                s.first,
+                new_depth,
+                history,
+                f1,
+                f2,
+                f3,
+                boost::make_function_output_iterator(
+                    std::function< void( const STATE & ) >(
+                        [&]( const auto & action )
+                        {
+                            if ( ! find_solution )
+                            {
+                                s.second( );
+                                find_solution = true;
+                            }
+                            * result = action;
+                            ++result;
+                        } ) ) );
+        if ( find_solution ) { return result; }
+        history.erase( s.first );
+    }
+    return result;
 }
 
 template< typename STATE, typename ALL_ACTION, typename NEXT_STATE, typename RETURN_IF, typename OUTITER >
 OUTITER iterative_deepening_depth_first_search( const STATE & inital_state,
-		ALL_ACTION f1,
-		NEXT_STATE f2,
-		RETURN_IF f3,
-		OUTITER result )
+        ALL_ACTION f1,
+        NEXT_STATE f2,
+        RETURN_IF f3,
+        OUTITER result )
 {
-	size_t i = 0;
-	bool break_loop = false;
-	while ( ! break_loop )
-	{
-		depth_first_search( inital_state, i, f1, f2, f3, boost::make_function_output_iterator(
-					[&]( const STATE & s )
-					{
-						break_loop = true;
-						* result = s;
-						++result;
-					} ) );
-		++i;
-	}
-	return result;
+    size_t i = 0;
+    bool break_loop = false;
+    while ( ! break_loop )
+    {
+        depth_first_search( inital_state, i, f1, f2, f3, boost::make_function_output_iterator(
+                    [&]( const STATE & s )
+                    {
+                        break_loop = true;
+                        * result = s;
+                        ++result;
+                    } ) );
+        ++i;
+    }
+    return result;
 }
 
 
 template< typename STATE, typename FORWARD, typename BACKWARD, typename OUTITER >
 OUTITER biderectional_breadth_first_search( const STATE & inital_state,
-		const STATE & final_state,
-		FORWARD f1,
-		BACKWARD f2,
-		OUTITER result )
+        const STATE & final_state,
+        FORWARD f1,
+        BACKWARD f2,
+        OUTITER result )
 {
-	std::list< std::pair< STATE, std::list< STATE > > >
-		forward( { { inital_state, std::list< STATE >( { inital_state } ) } } ),
-		backward( { { final_state, std::list< STATE >( { final_state } ) } } );
-	std::map< STATE, std::list< STATE > >
-		forward_expanded( { { inital_state, std::list< STATE >( ) } } ),
-		backward_expanded( { { final_state, std::list< STATE >( ) } } );
-	bool do_forward = true;
-	auto expand =
-		[&]( const STATE & s, auto it )
-		{
-			if ( do_forward ) { f1( s, it ); }
-			else { f2( s, it ); }
-		};
-	while ( ( ! forward.empty( ) ) || ( ! backward.empty( ) ) )
-	{
-		auto & current_map = do_forward ? forward : backward;
-		auto & detect_map = do_forward ? backward_expanded : forward_expanded;
-		auto & expand_map = do_forward ? forward_expanded : backward_expanded;
-		auto & current_state = current_map.front( );
-		if ( detect_map.count( current_state.first ) != 0 )
-		{
-			current_state.second.pop_back( );
-			( do_forward ? detect_map.find( current_state.first )->second : current_state.second ).reverse( );
-			current_state.second.splice( current_state.second.end( ), detect_map.find( current_state.first )->second );
-			return std::copy( current_state.second.begin( ), current_state.second.end( ), result );
-		}
-		expand( current_state.first,
-				boost::make_function_output_iterator( [&](const STATE & s)
-					{
-						current_map.push_back(
-						{
-							s,
-							[&]( )
-							{
-								auto ret = current_state.second;
-								ret.push_back(s);
-								return ret;
-							}( )
-						} );
-					} ) );
-		expand_map.insert( current_state );
-		current_map.pop_front( );
-		do_forward = ! do_forward;
-	}
-	return result;
+    std::list< std::pair< STATE, std::list< STATE > > >
+        forward( { { inital_state, std::list< STATE >( { inital_state } ) } } ),
+        backward( { { final_state, std::list< STATE >( { final_state } ) } } );
+    std::map< STATE, std::list< STATE > >
+        forward_expanded( { { inital_state, std::list< STATE >( ) } } ),
+        backward_expanded( { { final_state, std::list< STATE >( ) } } );
+    bool do_forward = true;
+    auto expand =
+        [&]( const STATE & s, auto it )
+        {
+            if ( do_forward ) { f1( s, it ); }
+            else { f2( s, it ); }
+        };
+    while ( ( ! forward.empty( ) ) || ( ! backward.empty( ) ) )
+    {
+        auto & current_map = do_forward ? forward : backward;
+        auto & detect_map = do_forward ? backward_expanded : forward_expanded;
+        auto & expand_map = do_forward ? forward_expanded : backward_expanded;
+        auto & current_state = current_map.front( );
+        if ( detect_map.count( current_state.first ) != 0 )
+        {
+            current_state.second.pop_back( );
+            ( do_forward ? detect_map.find( current_state.first )->second : current_state.second ).reverse( );
+            current_state.second.splice( current_state.second.end( ), detect_map.find( current_state.first )->second );
+            return std::copy( current_state.second.begin( ), current_state.second.end( ), result );
+        }
+        expand( current_state.first,
+                boost::make_function_output_iterator( [&](const STATE & s)
+                    {
+                        current_map.push_back(
+                        {
+                            s,
+                            [&]( )
+                            {
+                                auto ret = current_state.second;
+                                ret.push_back(s);
+                                return ret;
+                            }( )
+                        } );
+                    } ) );
+        expand_map.insert( current_state );
+        current_map.pop_front( );
+        do_forward = ! do_forward;
+    }
+    return result;
 }
 
 template< typename STATE, typename COST, typename EXPAND, typename EVAL, typename RETURN_IF, typename COST_OUTPUT, typename OUTITER >
 OUTITER greedy_best_first_search(
-		const STATE & inital_state,
-		const COST & inital_cost,
-		EXPAND f1,
-		EVAL f2,
-		RETURN_IF f3,
-		COST_OUTPUT f4,
-		OUTITER result )
+        const STATE & inital_state,
+        const COST & inital_cost,
+        EXPAND f1,
+        EVAL f2,
+        RETURN_IF f3,
+        COST_OUTPUT f4,
+        OUTITER result )
 { return best_first_search( inital_state, inital_cost, f1, f3, [&](const STATE & s, const COST &){return f2(s);}, f4, result ); }
 
-template< typename STATE, typename COST, typename ALL_ACTION, typename NEXT_STATE, typename EVAL, typename RETURN_IF, typename COST_OUTPUT, typename OUTITER >
+template
+<
+    typename ACTION,
+    typename STATE,
+    typename COST,
+    typename ALL_ACTION,
+    typename NEXT_STATE,
+    typename EVAL,
+    typename RETURN_IF,
+    typename COST_OUTPUT,
+    typename OUTITER
+>
 OUTITER A_star(
-		const STATE & inital_state,
-		const COST & inital_cost,
-		ALL_ACTION f1,
-		NEXT_STATE f2,
-		EVAL f3,
-		RETURN_IF f4,
-		COST_OUTPUT f5,
-		OUTITER result )
-{ return best_first_search( inital_state, inital_cost, f1, f2, f4, [&](const STATE & s, const COST & c){return f3(s) + c;}, f5, result ); }
+    const STATE & inital_state,
+    const COST & inital_cost,
+    ALL_ACTION f1,
+    NEXT_STATE f2,
+    EVAL f3,
+    RETURN_IF f4,
+    COST_OUTPUT f5,
+    OUTITER result )
+{
+    return best_first_search< ACTION >(
+            inital_state,
+            inital_cost,
+            f1,
+            f2,
+            f4,
+            [&](const STATE & s, const COST & c){return f3(s) + c;},
+            f5,
+            result );
+}
 
 template
 <
-	typename STATE, typename COST,
-	typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename EVAL_FUNC, typename OUTITER
+    typename STATE, typename COST,
+    typename EXPAND, typename RETURN_IF, typename COST_OUTPUT, typename EVAL_FUNC, typename OUTITER
 >
 OUTITER memory_bounded_best_first_search(
-		const STATE & inital_state,
-		const COST & inital_cost,
-		size_t container_limit,
-		EXPAND f1,
-		RETURN_IF f2,
-		EVAL_FUNC f3,
-		COST_OUTPUT f4,
-		OUTITER result )
+        const STATE & inital_state,
+        const COST & inital_cost,
+        size_t container_limit,
+        EXPAND f1,
+        RETURN_IF f2,
+        EVAL_FUNC f3,
+        COST_OUTPUT f4,
+        OUTITER result )
 {
-	typedef decltype( f3( std::declval< STATE >( ), std::declval< COST >( ) ) ) EVAL;
-	struct element
-	{
-		STATE state;
-		COST cost;
-		EVAL eval;
-		std::list< STATE > history;
-		element( const STATE & s, const COST & c, const EVAL & e, const std::list< STATE > & h ) : state( s ), cost( c ), eval( e ), history( h ) { }
-	};
-	using namespace boost;
-	using namespace multi_index;
-	struct state_tag { };
-	struct eval_tag { };
-	multi_index_container
-	<
-		element,
-		indexed_by
-		<
-			ordered_unique< tag< state_tag >, member< element, STATE, & element::state > >,
-			ordered_non_unique< tag< eval_tag >, member< element, EVAL, & element::eval > >
-		>
-	> container;
+    typedef decltype( f3( std::declval< STATE >( ), std::declval< COST >( ) ) ) EVAL;
+    struct element
+    {
+        STATE state;
+        COST cost;
+        EVAL eval;
+        std::list< STATE > history;
+        element( const STATE & s, const COST & c, const EVAL & e, const std::list< STATE > & h ) :
+            state( s ), cost( c ), eval( e ), history( h ) { }
+    };
+    using namespace boost;
+    using namespace multi_index;
+    struct state_tag { };
+    struct eval_tag { };
+    multi_index_container
+    <
+        element,
+        indexed_by
+        <
+            ordered_unique< tag< state_tag >, member< element, STATE, & element::state > >,
+            ordered_non_unique< tag< eval_tag >, member< element, EVAL, & element::eval > >
+        >
+    > container;
     auto & state_index = container.template get< state_tag >( );
     auto & eval_index = container.template get< eval_tag >( );
-	auto add_element = [&]( const STATE & s, const COST & c, const EVAL & e, const std::list< STATE > & h )
-	{
-		auto it = container.insert( element( s, c, e, h ) );
-		if ( ! it->first )
-		{
-			if ( it->second.cost > c )
-			{
-				it->second.cost = c;
-				it->second.e = f3( s, c );
-				it->second.history = h;
-			}
-		}
-	};
-	auto add_parent = [&]( const element & child )
-	{
-		assert( ! child.history.empty( ) );
-		const STATE & parent = child.history.back( );
-		if ( state_index.count( parent ) == 0 )
-		{
-			std::list< STATE > parent_history = child.history;
-			parent_history.pop_back( );
-			COST reverse_cost;
-			f1( child.state, boost::make_function_output_iterator(
-						[&]( const std::pair< STATE, COST > & p )
-						{
-							if ( p.first == child.state )
-							{ reverse_cost = p.second; }
-						} ) );
-			container.insert( element( parent, child.cost - reverse_cost, child.eval, parent_history ) );
-		}
-		else { state_index.modify( state_index.find( parent ), [&](element & e){ e.eval = std::max( e.eval, child.eval ); } ); }
-	};
-	add_element( inital_state, inital_cost, f3( inital_state, inital_cost ), { } );
-	while ( ! container.empty( ) )
-	{
-		const element & current_element = eval_index.begin( )->second;
-		if ( f2( current_element.state ) )
-		{
-			f4( current_element.cost );
-			auto res = std::copy( current_element.history.begin( ), current_element.history.end( ), result );
-			*res = current_element.state;
-			++res;
-			return res;
-		}
-		std::list< STATE > history = current_element.history;
-		history.push_back( current_element.state );
-		f1( current_element.state, boost::make_function_output_iterator(
-					[&]( const std::pair< STATE, COST > & p )
-					{
-						add_element(
-							p.first,
-							p.second + current_element.cost,
-							std::max( f3( p.first, p.second + current_element.cost, current_element.eval ) ),
-							history );
-					} ) );
-		state_index.erase( current_element );
-		while ( container.size( ) > container_limit )
-		{
-			const auto it = eval_index.rbegin( );
-			const element & remove_element = it->second;
-			if ( ! remove_element.history.empty( ) ) { add_parent( remove_element ); }
-			eval_index.erase( it );
-		}
-	}
-	return result;
+    auto add_element = [&]( const STATE & s, const COST & c, const EVAL & e, const std::list< STATE > & h )
+    {
+        auto it = container.insert( element( s, c, e, h ) );
+        if ( ! it->first )
+        {
+            if ( it->second.cost > c )
+            {
+                it->second.cost = c;
+                it->second.e = f3( s, c );
+                it->second.history = h;
+            }
+        }
+    };
+    auto add_parent = [&]( const element & child )
+    {
+        assert( ! child.history.empty( ) );
+        const STATE & parent = child.history.back( );
+        if ( state_index.count( parent ) == 0 )
+        {
+            std::list< STATE > parent_history = child.history;
+            parent_history.pop_back( );
+            COST reverse_cost;
+            f1( child.state, boost::make_function_output_iterator(
+                        [&]( const std::pair< STATE, COST > & p )
+                        {
+                            if ( p.first == child.state )
+                            { reverse_cost = p.second; }
+                        } ) );
+            container.insert( element( parent, child.cost - reverse_cost, child.eval, parent_history ) );
+        }
+        else
+        {
+            state_index.modify(
+                state_index.find( parent ),
+                [&](element & e){ e.eval = std::max( e.eval, child.eval ); } );
+        }
+    };
+    add_element( inital_state, inital_cost, f3( inital_state, inital_cost ), { } );
+    while ( ! container.empty( ) )
+    {
+        const element & current_element = eval_index.begin( )->second;
+        if ( f2( current_element.state ) )
+        {
+            f4( current_element.cost );
+            auto res = std::copy( current_element.history.begin( ), current_element.history.end( ), result );
+            *res = current_element.state;
+            ++res;
+            return res;
+        }
+        std::list< STATE > history = current_element.history;
+        history.push_back( current_element.state );
+        f1( current_element.state, boost::make_function_output_iterator(
+                    [&]( const std::pair< STATE, COST > & p )
+                    {
+                        add_element(
+                            p.first,
+                            p.second + current_element.cost,
+                            std::max( f3( p.first, p.second + current_element.cost, current_element.eval ) ),
+                            history );
+                    } ) );
+        state_index.erase( current_element );
+        while ( container.size( ) > container_limit )
+        {
+            const auto it = eval_index.rbegin( );
+            const element & remove_element = it->second;
+            if ( ! remove_element.history.empty( ) ) { add_parent( remove_element ); }
+            eval_index.erase( it );
+        }
+    }
+    return result;
 }
 
 template
 <
-	typename STATE, typename COST, typename EVAL,
-	typename EXPAND, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC, typename EVAL_OUTPUT
+    typename STATE, typename COST, typename EVAL,
+    typename EXPAND, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC, typename EVAL_OUTPUT
 >
 OUTITER iterative_best_first_search_helper(
-		const STATE & inital_state,
-		const COST & inital_cost,
-		const EVAL & upper_bound,
-		std::set< STATE > & history,
-		EXPAND f1,
-		RETURN_IF f2,
-		EVAL_FUNC f3,
-		EVAL_OUTPUT f4,
-		OUTITER result )
+        const STATE & inital_state,
+        const COST & inital_cost,
+        const EVAL & upper_bound,
+        std::set< STATE > & history,
+        EXPAND f1,
+        RETURN_IF f2,
+        EVAL_FUNC f3,
+        EVAL_OUTPUT f4,
+        OUTITER result )
 {
-	if ( f2( inital_state ) )
-	{
-		* result = inital_state;
-		++result;
-		return result;
-	}
-	EVAL inital_eval = f3( inital_state, inital_cost );
-	if ( upper_bound < inital_eval )
-	{
-		f4( inital_eval );
-		return result;
-	}
-	std::vector< std::pair< STATE, EVAL > > vec;
-	f1( inital_state, std::back_inserter( vec ) );
-	for ( const std::pair< STATE, EVAL > & s : vec )
-	{
-		if ( history.count( s.first ) != 0 ) { continue; }
-		history.insert( s.first );
-		bool find_solution = false;
-		iterative_best_first_search_helper(
-				s,
-				inital_cost + s.second,
-				upper_bound,
-				history,
-				f1,
-				f2,
-				f3,
-				f4,
-				boost::make_function_output_iterator(
-					std::function< void( const STATE & ) >(
-						[&]( const auto & state )
-						{
-							if ( ! find_solution )
-							{
-								* result = inital_state;
-								++result;
-								find_solution = true;
-							}
-							* result = state;
-							++result;
-						} ) ) );
-		if ( find_solution ) { return result; }
-		history.erase( s );
-	}
-	return result;
+    if ( f2( inital_state ) )
+    {
+        * result = inital_state;
+        ++result;
+        return result;
+    }
+    EVAL inital_eval = f3( inital_state, inital_cost );
+    if ( upper_bound < inital_eval )
+    {
+        f4( inital_eval );
+        return result;
+    }
+    std::vector< std::pair< STATE, EVAL > > vec;
+    f1( inital_state, std::back_inserter( vec ) );
+    for ( const std::pair< STATE, EVAL > & s : vec )
+    {
+        if ( history.count( s.first ) != 0 ) { continue; }
+        history.insert( s.first );
+        bool find_solution = false;
+        iterative_best_first_search_helper(
+                s,
+                inital_cost + s.second,
+                upper_bound,
+                history,
+                f1,
+                f2,
+                f3,
+                f4,
+                boost::make_function_output_iterator(
+                    std::function< void( const STATE & ) >(
+                        [&]( const auto & state )
+                        {
+                            if ( ! find_solution )
+                            {
+                                * result = inital_state;
+                                ++result;
+                                find_solution = true;
+                            }
+                            * result = state;
+                            ++result;
+                        } ) ) );
+        if ( find_solution ) { return result; }
+        history.erase( s );
+    }
+    return result;
 }
 
 template
 <
-	typename STATE, typename COST, typename EVAL,
-	typename EXPAND, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC, typename EVAL_OUTPUT
+    typename STATE, typename COST, typename EVAL,
+    typename EXPAND, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC, typename EVAL_OUTPUT
 >
 OUTITER iterative_best_first_search(
-		const STATE & inital_state,
-		const COST & inital_cost,
-		const EVAL & min_eval,
-		const EVAL & upper_bound,
-		EXPAND f1,
-		RETURN_IF f2,
-		EVAL_FUNC f3,
-		OUTITER result )
+        const STATE & inital_state,
+        const COST & inital_cost,
+        const EVAL & min_eval,
+        const EVAL & upper_bound,
+        EXPAND f1,
+        RETURN_IF f2,
+        EVAL_FUNC f3,
+        OUTITER result )
 {
-	EVAL e;
-	std::set< STATE > history;
-	while ( e < min_eval )
-	{
-		iterative_best_first_search_helper(
-				inital_state, inital_cost, upper_bound, history, f1, f2, f3, [&](const EVAL & ev){ e = std::max( e, ev ); }, result );
-	}
+    EVAL e;
+    std::set< STATE > history;
+    while ( e < min_eval )
+    {
+        iterative_best_first_search_helper(
+            inital_state,
+            inital_cost,
+            upper_bound,
+            history,
+            f1,
+            f2,
+            f3,
+            [&](const EVAL & ev) { e = std::max( e, ev ); },
+            result );
+    }
 }
 
 template
 <
-	typename STATE,
-	typename EXPAND, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC
+    typename STATE,
+    typename EXPAND, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC
 >
 OUTITER hill_climbing(
-		const STATE & inital_state,
-		EXPAND f1,
-		RETURN_IF f2,
-		EVAL_FUNC f3,
-		OUTITER result )
+        const STATE & inital_state,
+        EXPAND f1,
+        RETURN_IF f2,
+        EVAL_FUNC f3,
+        OUTITER result )
 { return beam_search( inital_state, 1, f1, f2, f3, result ); }
 
 template
 <
-	typename STATE,
-	typename EXPAND, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC
+    typename STATE,
+    typename EXPAND, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC
 >
 OUTITER beam_search(
-		const STATE & inital_state,
-		size_t beam_num,
-		EXPAND f1,
-		RETURN_IF f2,
-		EVAL_FUNC f3,
-		OUTITER result )
+        const STATE & inital_state,
+        size_t beam_num,
+        EXPAND f1,
+        RETURN_IF f2,
+        EVAL_FUNC f3,
+        OUTITER result )
 {
-	if ( beam_num < 1 ) { throw std::domain_error( "must have at least one beam" ); }
-	typedef decltype( f3( inital_state ) ) EVAL;
-	std::multimap< EVAL, STATE > current = { { f3( inital_state ), inital_state } };
-	STATE best = inital_state;
-	while ( true )
-	{
-		if ( f2( current ) ) { return result; }
-		std::multimap< EVAL, STATE > map( current );
-		for ( const auto & i : current ) { f1( i.second, boost::make_function_output_iterator( [&](const STATE & s){ map.insert( {f3(s),s} ); } ) ); }
-		while ( map.size( ) > beam_num ) { map.erase( [&](){auto tem = map.end();--tem;return tem;}() ); }
-		if ( f3( best ) < f3( * map.begin( ) ) )
-		{
-			*result = current;
-			++result;
-			best = current;
-		}
-		map.swap( current );
-	}
-	return result;
+    if ( beam_num < 1 ) { throw std::domain_error( "must have at least one beam" ); }
+    typedef decltype( f3( inital_state ) ) EVAL;
+    std::multimap< EVAL, STATE > current = { { f3( inital_state ), inital_state } };
+    STATE best = inital_state;
+    while ( true )
+    {
+        if ( f2( current ) ) { return result; }
+        std::multimap< EVAL, STATE > map( current );
+        for ( const auto & i : current )
+        { f1( i.second, boost::make_function_output_iterator( [&](const STATE & s) { map.insert( { f3(s), s } ); } ) ); }
+        while ( map.size( ) > beam_num ) { map.erase( [&](){auto tem = map.end();--tem;return tem;}() ); }
+        if ( f3( best ) < f3( * map.begin( ) ) )
+        {
+            *result = current;
+            ++result;
+            best = current;
+        }
+        map.swap( current );
+    }
+    return result;
 }
 
 template
 <
-	typename STATE, typename EP_COUNT, typename RANDOM_DEVICE,
-	typename EXPAND, typename RETURN_IF, typename OUTITER, typename MOVE_PROB, typename EVAL_FUNC
+    typename STATE, typename EP_COUNT, typename RANDOM_DEVICE,
+    typename EXPAND, typename RETURN_IF, typename OUTITER, typename MOVE_PROB, typename EVAL_FUNC
 >
 OUTITER simulated_annealing(
-		const STATE & inital_state,
-		const EP_COUNT & max_num,
-		RANDOM_DEVICE & rd,
-		EXPAND f1,
-		RETURN_IF f2,
-		MOVE_PROB f3,
-		EVAL_FUNC f4,
-		OUTITER result )
+        const STATE & inital_state,
+        const EP_COUNT & max_num,
+        RANDOM_DEVICE & rd,
+        EXPAND f1,
+        RETURN_IF f2,
+        MOVE_PROB f3,
+        EVAL_FUNC f4,
+        OUTITER result )
 {
-	EP_COUNT ep = 0;
-	STATE current = inital_state;
-	STATE best = inital_state;
-	while ( ep < max_num )
-	{
-		if ( f2( current, best, ep ) ) { return result; }
-		std::vector< STATE > next;
-		f1(current,std::back_inserter(next));
-		std::uniform_int_distribution<> uid( 0, next.size( ) - 1 );
-		std::uniform_real_distribution<> urd;
-		const STATE & comp_state = next[uid(rd)];
-		if ( f3( current, comp_state ) > urd(rd) ) { current = comp_state; }
-		if ( f4( best ) < f4( current ) )
-		{
-			*result = current;
-			++result;
-			best = current;
-		}
-		++ep;
-	}
-	return result;
+    EP_COUNT ep = 0;
+    STATE current = inital_state;
+    STATE best = inital_state;
+    while ( ep < max_num )
+    {
+        if ( f2( current, best, ep ) ) { return result; }
+        std::vector< STATE > next;
+        f1(current,std::back_inserter(next));
+        std::uniform_int_distribution<> uid( 0, next.size( ) - 1 );
+        std::uniform_real_distribution<> urd;
+        const STATE & comp_state = next[uid(rd)];
+        if ( f3( current, comp_state ) > urd(rd) ) { current = comp_state; }
+        if ( f4( best ) < f4( current ) )
+        {
+            *result = current;
+            ++result;
+            best = current;
+        }
+        ++ep;
+    }
+    return result;
 }
 
 template
 <
-	typename STATE, typename STEP,
-	typename DELTA, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC, typename STEP_CHANGE
+    typename STATE, typename STEP,
+    typename DELTA, typename RETURN_IF, typename OUTITER, typename EVAL_FUNC, typename STEP_CHANGE
 >
 OUTITER gradient_descent_method(
-		const STATE & inital_state,
-		const STEP & step,
-		DELTA f1,
-		RETURN_IF f2,
-		EVAL_FUNC f3,
-		STEP_CHANGE f4,
-		OUTITER result )
+        const STATE & inital_state,
+        const STEP & step,
+        DELTA f1,
+        RETURN_IF f2,
+        EVAL_FUNC f3,
+        STEP_CHANGE f4,
+        OUTITER result )
 {
-	STEP a( step );
-	STATE current = inital_state;
-	STATE best = inital_state;
-	while ( true )
-	{
-		if ( f2( current, best ) ) { return result; }
-		current += a * f1( inital_state );
-		if ( f3( best ) < f3( current ) )
-		{
-			*result = current;
-			++result;
-			best = current;
-		}
-		a = f4( a );
-	}
-	return result;
+    STEP a( step );
+    STATE current = inital_state;
+    STATE best = inital_state;
+    while ( true )
+    {
+        if ( f2( current, best ) ) { return result; }
+        current += a * f1( inital_state );
+        if ( f3( best ) < f3( current ) )
+        {
+            *result = current;
+            ++result;
+            best = current;
+        }
+        a = f4( a );
+    }
+    return result;
 }
 
 template
@@ -880,11 +956,15 @@ boost::optional< std::map< STATE, ACTION > > and_or_search(
         }
         return dead_end ? faliure : boost::optional< std::map< STATE, ACTION > >( ret );
     };
-    auto or_test = [&]( const auto & self, const STATE & s, std::set< STATE > & history ) -> boost::optional< std::map< STATE, ACTION > >
-    {
-        if ( f1( s ) ) { return boost::optional< std::map< STATE, ACTION > >( std::map< STATE, ACTION >( { } ) ); }
-        boost::optional< std::map< STATE, ACTION > > ret;
-        f2( s, boost::make_function_output_iterator(
+    auto or_test =
+            [&]( const auto & self, const STATE & s, std::set< STATE > & history ) ->
+                boost::optional< std::map< STATE, ACTION > >
+            {
+                if ( f1( s ) ) { return boost::optional< std::map< STATE, ACTION > >( std::map< STATE, ACTION >( { } ) ); }
+                boost::optional< std::map< STATE, ACTION > > ret;
+                f2(
+                    s,
+                    boost::make_function_output_iterator(
                     [&](const ACTION & act)
                     {
                         if ( ! ret )
@@ -896,99 +976,125 @@ boost::optional< std::map< STATE, ACTION > > and_or_search(
                             if ( ret ) { ret->insert( std::make_pair( s, act ) ); }
                         }
                     } ) );
-        return ret;
-    };
+                return ret;
+            };
     std::set< STATE > history = { };
     return or_test( or_test, inital_state, history );
 }
 
 template< typename STATE, typename NEXT_STATE, typename IS_END, typename EVAL_FUNC >
 auto minmax_search(
-		const STATE & inital_state,
-		bool maximize,
-		NEXT_STATE f1,
-		IS_END f2,
-		EVAL_FUNC f3 )
+        const STATE & inital_state,
+        bool maximize,
+        NEXT_STATE f1,
+        IS_END f2,
+        EVAL_FUNC f3 )
 {
-	typedef decltype( f4( inital_state ) ) EVAL;
-	if ( f3( inital_state ) ) { return f4( inital_state ); }
-	std::vector< std::pair< STATE, EVAL > > vec;
-	f1(
-		inital_state,
-		boost::make_function_output_iterator( [&](const STATE & state){ vec.push_back( std::make_pair( state, minmax_search( state, ! maximize, f1, f2, f3 ) ) ); } ) );
-	assert( ! vec.empty( ) );
-	std::sort( vec.begin( ), vec.end( ), []( const std::pair< STATE, EVAL > & l, const std::pair< STATE, EVAL > & r ){ return l.second < r.second; } );
-	return maximize ? vec.back( ).second : vec.front( ).second;
+    typedef decltype( f4( inital_state ) ) EVAL;
+    if ( f3( inital_state ) ) { return f4( inital_state ); }
+    std::vector< std::pair< STATE, EVAL > > vec;
+    f1(
+        inital_state,
+        boost::make_function_output_iterator(
+            [&](const STATE & state)
+            { vec.push_back( std::make_pair( state, minmax_search( state, ! maximize, f1, f2, f3 ) ) ); } ) );
+    assert( ! vec.empty( ) );
+    std::sort(
+        vec.begin( ),
+        vec.end( ),
+        []( const std::pair< STATE, EVAL > & l, const std::pair< STATE, EVAL > & r ) { return l.second < r.second; } );
+    return maximize ? vec.back( ).second : vec.front( ).second;
 }
 
 template< typename STATE, typename NEXT_STATE, typename IS_END, typename EVAL_FUNC, typename STOP_IF, typename OUTITER >
 OUTITER alpha_beta_pruning_search(
-		const STATE & inital_state,
-		bool maximize,
-		NEXT_STATE f1,
-		IS_END f2,
-		EVAL_FUNC f3,
-		STOP_IF f4,
-		OUTITER result )
+        const STATE & inital_state,
+        bool maximize,
+        NEXT_STATE f1,
+        IS_END f2,
+        EVAL_FUNC f3,
+        STOP_IF f4,
+        OUTITER result )
 {
-	if ( f2( inital_state ) )
-	{
-		* result = f3( inital_state ).first;
-		++result;
-		return result;
-	}
-	typedef decltype( f3( inital_state ).first ) EVAL;
-	struct tree
-	{
-		const STATE & this_state;
-		bool exploration_completed;
-		EVAL this_eval;
-		std::pair< EVAL, EVAL > bound; //First is upper bound
-		bool maximize;
-		std::vector< std::shared_ptr< tree > > childs;
-	};
-	auto explore =
+    if ( f2( inital_state ) )
+    {
+        * result = f3( inital_state ).first;
+        ++result;
+        return result;
+    }
+    typedef decltype( f3( inital_state ).first ) EVAL;
+    struct tree
+    {
+        const STATE & this_state;
+        bool exploration_completed;
+        EVAL this_eval;
+        std::pair< EVAL, EVAL > bound; //First is upper bound
+        bool maximize;
+        std::vector< std::shared_ptr< tree > > childs;
+    };
+    auto explore =
         [&]( auto & self, const tree & t )
-		{
-			if ( t.exploration_completed ) { return; }
-			if ( t.childs.empty( ) ) { f1( t.this_state, boost::make_function_output_iterator( [&](const STATE & s)
-			{
-				auto res = f3( s );
-				t.childs.push_back(
-							std::shared_ptr< tree >(
-								new tree( { s, f2( s ), res.first, res.second, ! t.maximize, std::vector< std::shared_ptr< tree > >( ) } ) ) ); } ) );
-			}
-			else
-			{
-				assert( ! t.childs.empty( ) );
-				EVAL current_bound = std::max_element(
-						t.childs.begin( ),
-						t.childs.end( ),
-						[&]( const std::shared_ptr< tree > & l, const std::shared_ptr< tree > & r )
+        {
+            if ( t.exploration_completed ) { return; }
+            if ( t.childs.empty( ) ) { f1( t.this_state, boost::make_function_output_iterator( [&](const STATE & s)
+            {
+                auto res = f3( s );
+                t.childs.push_back(
+                    std::make_shared< tree >(
+                        s, f2( s ), res.first, res.second, ! t.maximize, std::vector< std::shared_ptr< tree > >( ) ) ); } ) );
+            }
+            else
+            {
+                assert( ! t.childs.empty( ) );
+                EVAL current_bound = std::max_element(
+                        t.childs.begin( ),
+                        t.childs.end( ),
+                        [&]( const std::shared_ptr< tree > & l, const std::shared_ptr< tree > & r )
                         { return t.maximize ? l->bound.second < l->bound.second : r->bound.first > r->bound.first; } );
-				for ( auto it = t.childs.begin( ); it != t.childs.end( ); ++it )
-				{
-					std::shared_ptr< tree > & p = * it;
-					if ( t.maximize ? p->bound.first < current_bound : p->bound.second > current_bound ) { it = t.childs.erase( it ); }
+                for ( auto it = t.childs.begin( ); it != t.childs.end( ); ++it )
+                {
+                    std::shared_ptr< tree > & p = * it;
+                    if ( t.maximize ? p->bound.first < current_bound : p->bound.second > current_bound )
+                    { it = t.childs.erase( it ); }
                     self( self, * p );
-				}
-			}
-			t.exploration_completed = std::all_of( t.childs.begin( ), t.childs.end( ), []( const std::shared_ptr< tree > & t ){ return t->exploration_completed; } );
-			t.bound.first = std::max_element( t.childs.begin( ), t.childs.end( ), []( const std::shared_ptr< tree > & l, const std::shared_ptr< tree > & r ){ return l->bound.first < r->bound.first; } );
-			t.bound.second = std::min_element( t.childs.begin( ), t.childs.end( ), []( const std::shared_ptr< tree > & l, const std::shared_ptr< tree > & r ){ return l->bound.second < r->bound.second; } );
-			auto eval_comp = []( const std::shared_ptr< tree > & l, const std::shared_ptr< tree > & r ){ return l->this_eval < r->this_eval; };
-			t.this_eval = t.maximize ? std::max_element( t.childs.begin( ), t.hilds.end( ), eval_comp ) : std::min_element( t.childs.begin( ), t.childs.end( ), eval_comp );
-		};
-	auto res = f3( inital_state );
-	tree root( { inital_state, false, res.first, res.second, maximize, std::vector< std::shared_ptr< tree > >( ) } );
-	while ( ! root.exploration_completed )
-	{
-		* result = root.this_eval;
-		++result;
-		if ( f4( ) ) { return result; }
-		explore( root );
-	}
-	return result;
+                }
+            }
+            t.exploration_completed =
+                std::all_of(
+                    t.childs.begin( ),
+                    t.childs.end( ),
+                    []( const std::shared_ptr< tree > & t )
+                    { return t->exploration_completed; } );
+            t.bound.first =
+                std::max_element(
+                    t.childs.begin( ),
+                    t.childs.end( ),
+                    []( const std::shared_ptr< tree > & l, const std::shared_ptr< tree > & r )
+                    { return l->bound.first < r->bound.first; } );
+            t.bound.second =
+                std::min_element(
+                    t.childs.begin( ),
+                    t.childs.end( ),
+                    []( const std::shared_ptr< tree > & l, const std::shared_ptr< tree > & r )
+                    { return l->bound.second < r->bound.second; } );
+            auto eval_comp =
+                []( const std::shared_ptr< tree > & l, const std::shared_ptr< tree > & r )
+                { return l->this_eval < r->this_eval; };
+            t.this_eval =
+                t.maximize ?
+                std::max_element( t.childs.begin( ), t.hilds.end( ), eval_comp ) :
+                std::min_element( t.childs.begin( ), t.childs.end( ), eval_comp );
+        };
+    auto res = f3( inital_state );
+    tree root( { inital_state, false, res.first, res.second, maximize, std::vector< std::shared_ptr< tree > >( ) } );
+    while ( ! root.exploration_completed )
+    {
+        * result = root.this_eval;
+        ++result;
+        if ( f4( ) ) { return result; }
+        explore( root );
+    }
+    return result;
 }
 
 #endif // SEARCH_HPP
