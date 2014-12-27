@@ -61,7 +61,7 @@ OUTITER best_first_search(
             [&]( const STATE & state, const COST & cost, std::list< STATE > && history,
                  std::list< ACTION_TYPE > && act )
     { return element( state, cost, std::move( history ), eval_func( state, cost ), std::move( act ) ); };
-    auto update_element = [&]( element & e ){ e.eval = eval_func( e.state, e.cost ); };
+    auto update_element = [&]( element & e ) { e.eval = eval_func( e.state, e.cost ); };
     multi_index_container
     <
         element,
@@ -70,11 +70,11 @@ OUTITER best_first_search(
             ordered_unique< tag< state_tag >, member< element, STATE, & element::state > >,
             ordered_non_unique< tag< eval_tag >, member< element, EVAL, & element::eval > >
         >
-    > container;
-    container.insert( make_element( inital_state, inital_cost, { inital_state }, { } ) );
-    auto & goodness_index = container.template get< eval_tag >( );
-    auto & state_index = container.template get< state_tag >( );
-    while ( ! container.empty( ) )
+    > query;
+    query.insert( make_element( inital_state, inital_cost, { inital_state }, { } ) );
+    auto & goodness_index = query.template get< eval_tag >( );
+    auto & state_index = query.template get< state_tag >( );
+    while ( ! query.empty( ) )
     {
         auto iterator = goodness_index.begin( );
         const element & current_element = * iterator;
@@ -560,16 +560,52 @@ OUTITER biderectional_breadth_first_search( const STATE & inital_state,
     return result;
 }
 
-template< typename STATE, typename COST, typename EXPAND, typename EVAL, typename RETURN_IF, typename COST_OUTPUT, typename OUTITER >
+struct unit
+{
+    unit operator + ( const unit & ) const { return unit( ); }
+    bool operator < ( const unit & ) const { return false; }
+    bool operator > ( const unit & ) const { return false; }
+    bool operator <= ( const unit & ) const { return true; }
+    bool operator >= ( const unit & ) const { return true; }
+    bool operator != ( const unit & ) const { return false; }
+    bool operator == ( const unit & ) const { return true; }
+};
+
+template
+<
+    typename ACTION_TYPE,
+    typename STATE,
+    typename ALL_ACTION,
+    typename EVAL_FUNC,
+    typename NEXT_STATE,
+    typename RETURN_IF,
+    typename OUTITER
+>
 OUTITER greedy_best_first_search(
         const STATE & inital_state,
-        const COST & inital_cost,
-        EXPAND f1,
-        EVAL f2,
+        ALL_ACTION f1,
+        NEXT_STATE f2,
+        EVAL_FUNC eval_func,
         RETURN_IF f3,
-        COST_OUTPUT f4,
         OUTITER result )
-{ return best_first_search( inital_state, inital_cost, f1, f3, [&](const STATE & s, const COST &){return f2(s);}, f4, result ); }
+{
+    return
+        best_first_search< ACTION_TYPE >(
+            inital_state,
+            unit( ),
+            [&]( const STATE & s, auto it )
+            {
+                f1(
+                    s,
+                    boost::make_function_output_iterator(
+                        [&]( const ACTION_TYPE & s ) { *it = std::make_pair( s, unit( ) ); ++it; } ) );
+            },
+            f2,
+            f3,
+            [&](const STATE & s, const unit &) { return eval_func( s ); },
+            []( unit ) { },
+            result );
+}
 
 template
 <
