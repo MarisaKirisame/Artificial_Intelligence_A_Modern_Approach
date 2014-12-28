@@ -536,61 +536,98 @@ OUTITER iterative_deepening_depth_first_search( const STATE & inital_state,
 }
 
 
-template< typename STATE, typename FORWARD, typename BACKWARD, typename OUTITER >
-OUTITER biderectional_breadth_first_search( const STATE & inital_state,
-        const STATE & final_state,
-        FORWARD f1,
-        BACKWARD f2,
-        OUTITER result )
+template
+<
+    typename FORWARD_ACTION,
+    typename BACKWARD_ACTION,
+    typename STATE,
+    typename ALL_FORWARD_ACTION,
+    typename ALL_BACKWARD_ACTION,
+    typename NEXT_FORWARD,
+    typename NEXT_BACKWARD,
+    typename FORWARD_ACTION_OUTITER,
+    typename BACKWARD_ACTION_OUTITER
+>
+std::pair< FORWARD_ACTION_OUTITER, BACKWARD_ACTION_OUTITER >
+biderectional_breadth_first_search(
+    const STATE & inital_state,
+    const STATE & final_state,
+    ALL_FORWARD_ACTION all_forward_action,
+    NEXT_FORWARD next_forward,
+    FORWARD_ACTION_OUTITER forward_action_outiter,
+    ALL_BACKWARD_ACTION all_backward_action,
+    NEXT_BACKWARD next_backward,
+    BACKWARD_ACTION_OUTITER backward_action_outiter )
 {
-    std::list< std::pair< STATE, std::list< STATE > > >
-        forward( { { inital_state, std::list< STATE >( { inital_state } ) } } ),
-        backward( { { final_state, std::list< STATE >( { final_state } ) } } );
-    std::map< STATE, std::list< STATE > >
-        forward_expanded( { { inital_state, std::list< STATE >( ) } } ),
-        backward_expanded( { { final_state, std::list< STATE >( ) } } );
+    std::list< STATE > forward { inital_state };
+    std::list< STATE > backward { final_state };
+    std::map< STATE, std::list< FORWARD_ACTION > >
+        forward_expanded( { { inital_state, std::list< FORWARD_ACTION >( ) } } );
+    std::map< STATE, std::list< BACKWARD_ACTION > >
+        backward_expanded( { { final_state, std::list< BACKWARD_ACTION >( ) } } );
     bool do_forward = true;
-    auto expand =
-        [&]( const STATE & s, auto it )
+    auto has = [&]( ) { return ! ( do_forward ? forward : backward ).empty( ); };
+    auto get = [&]( ) { return do_forward ? forward.front( ) : backward.front( ); };
+    auto pop = [&]( ) { (do_forward ? forward : backward).pop_front( ); };
+    auto opposite_has =
+        [&]( const STATE & n )
+        { return ( do_forward ? backward_expanded.count( n ) : forward_expanded.count( n ) ) != 0; };
+    auto output_all =
+        [&]( const STATE & n )
         {
-            if ( do_forward ) { f1( s, it ); }
-            else { f2( s, it ); }
+            throw std::make_pair(
+                    std::copy(
+                        forward_expanded[n].begin( ),
+                        forward_expanded[n].end( ),
+                        forward_action_outiter ),
+                    std::copy(
+                        backward_expanded[n].begin( ),
+                        backward_expanded[n].end( ),
+                        backward_action_outiter ) );
         };
-    while ( ( ! forward.empty( ) ) || ( ! backward.empty( ) ) )
-    {
-        auto & current_map = do_forward ? forward : backward;
-        auto & detect_map = do_forward ? backward_expanded : forward_expanded;
-        auto & expand_map = do_forward ? forward_expanded : backward_expanded;
-        auto & current_state = current_map.front( );
-        if ( detect_map.count( current_state.first ) != 0 )
+    auto update =
+        [&]( auto next, const auto & a, const STATE & e, auto & forward_expanded, auto & forward )
         {
-            current_state.second.pop_back( );
-            ( do_forward ? detect_map.find( current_state.first )->second : current_state.second ).
-                    reverse( );
-            current_state.second.splice(
-                current_state.second.end( ),
-                detect_map.find( current_state.first )->second );
-            return std::copy( current_state.second.begin( ), current_state.second.end( ), result );
+            STATE n = next( e, a );
+            if ( forward_expanded.count( n ) == 0 )
+            {
+                auto actions = forward_expanded[e];
+                actions.push_back( a );
+                forward_expanded.insert( { n, std::move( actions ) } );
+                forward.push_back( n );
+                if ( opposite_has( n ) ) { output_all( n ); }
+            }
+        };
+    try
+    {
+        while ( ( ! forward.empty( ) ) || ( ! backward.empty( ) ) )
+        {
+            if ( has( ) )
+            {
+                STATE e = get( );
+                if ( do_forward )
+                {
+                    all_forward_action(
+                        e,
+                        boost::make_function_output_iterator(
+                            [&]( const FORWARD_ACTION & a )
+                            { update( next_forward, a, e, forward_expanded, forward ); } ) );
+                }
+                else
+                {
+                    all_backward_action(
+                        e,
+                        boost::make_function_output_iterator(
+                            [&]( const BACKWARD_ACTION & a )
+                            { update( next_backward, a, e, backward_expanded, backward ); } ) );
+                }
+                pop( );
+            }
+            do_forward = ! do_forward;
         }
-        expand( current_state.first,
-                boost::make_function_output_iterator( [&](const STATE & s)
-                    {
-                        current_map.push_back(
-                        {
-                            s,
-                            [&]( )
-                            {
-                                auto ret = current_state.second;
-                                ret.push_back(s);
-                                return ret;
-                            }( )
-                        } );
-                    } ) );
-        expand_map.insert( current_state );
-        current_map.pop_front( );
-        do_forward = ! do_forward;
+        return std::make_pair( forward_action_outiter, backward_action_outiter );
     }
-    return result;
+    catch ( std::pair< FORWARD_ACTION_OUTITER, BACKWARD_ACTION_OUTITER > e ) { return e; }
 }
 
 struct unit
