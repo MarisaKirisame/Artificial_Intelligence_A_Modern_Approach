@@ -11,54 +11,56 @@
 #include "wumpus_world.hpp"
 enum location
 {
-	Sibiu, Fagaras, Bucharest, Pitesti, Rimnicu_Vilcea,
-	Oradea, Zerind, Arad, Timisoara, Lugoj,
-	Mehadia, Drobeta, Craivoa, Giurgiu, Urziceni,
-	Hirsova, Eforie, Vaslui, Iasi, Neamt
+    Sibiu, Fagaras, Bucharest, Pitesti, Rimnicu_Vilcea,
+    Oradea, Zerind, Arad, Timisoara, Lugoj,
+    Mehadia, Drobeta, Craivoa, Giurgiu, Urziceni,
+    Hirsova, Eforie, Vaslui, Iasi, Neamt
 };
 
 const std::multimap< location, std::pair< location, size_t > > & map( )
 {
-	static std::multimap< location, std::pair< location, size_t > > ret( []()
-			{
-				std::multimap< location, std::pair< location, size_t > > ret;
-				auto add_edge = [&]( location a, location b, size_t cost )
-				{
-					ret.insert( { a, { b, cost } } );
-					ret.insert( { b, { a, cost } } );
-				};
-				add_edge( Sibiu, Rimnicu_Vilcea, 80 );
-				add_edge( Rimnicu_Vilcea, Pitesti, 97 );
-				add_edge( Pitesti, Bucharest, 101 );
-				add_edge( Bucharest, Fagaras, 211 );
-				add_edge( Fagaras, Sibiu, 99 );
-				add_edge( Oradea, Zerind, 71 );
-				add_edge( Zerind, Arad, 75 );
-				add_edge( Arad, Timisoara, 118 );
-				add_edge( Oradea, Sibiu, 151 );
-				add_edge( Arad, Sibiu, 140 );
-				add_edge( Timisoara, Lugoj, 111 );
-				add_edge( Lugoj, Mehadia, 70 );
-				add_edge( Mehadia, Drobeta, 75 );
-				add_edge( Drobeta, Craivoa, 120 );
-				add_edge( Craivoa, Rimnicu_Vilcea, 146 );
-				add_edge( Craivoa, Pitesti, 138 );
-				add_edge( Bucharest, Giurgiu, 90 );
-				add_edge( Bucharest, Urziceni, 85 );
-				add_edge( Urziceni, Hirsova, 98 );
-				add_edge( Hirsova, Eforie, 86 );
-				add_edge( Urziceni, Vaslui, 142 );
-				add_edge( Vaslui, Iasi, 92 );
-				add_edge( Iasi, Neamt, 87 );
-				return ret;
-			}( ) );
-	return ret;
+    static std::multimap< location, std::pair< location, size_t > > ret( []()
+            {
+                std::multimap< location, std::pair< location, size_t > > ret;
+                auto add_edge = [&]( location a, location b, size_t cost )
+                {
+                    ret.insert( { a, { b, cost } } );
+                    ret.insert( { b, { a, cost } } );
+                };
+                add_edge( Sibiu, Rimnicu_Vilcea, 80 );
+                add_edge( Rimnicu_Vilcea, Pitesti, 97 );
+                add_edge( Pitesti, Bucharest, 101 );
+                add_edge( Bucharest, Fagaras, 211 );
+                add_edge( Fagaras, Sibiu, 99 );
+                add_edge( Oradea, Zerind, 71 );
+                add_edge( Zerind, Arad, 75 );
+                add_edge( Arad, Timisoara, 118 );
+                add_edge( Oradea, Sibiu, 151 );
+                add_edge( Arad, Sibiu, 140 );
+                add_edge( Timisoara, Lugoj, 111 );
+                add_edge( Lugoj, Mehadia, 70 );
+                add_edge( Mehadia, Drobeta, 75 );
+                add_edge( Drobeta, Craivoa, 120 );
+                add_edge( Craivoa, Rimnicu_Vilcea, 146 );
+                add_edge( Craivoa, Pitesti, 138 );
+                add_edge( Bucharest, Giurgiu, 90 );
+                add_edge( Bucharest, Urziceni, 85 );
+                add_edge( Urziceni, Hirsova, 98 );
+                add_edge( Hirsova, Eforie, 86 );
+                add_edge( Urziceni, Vaslui, 142 );
+                add_edge( Vaslui, Iasi, 92 );
+                add_edge( Iasi, Neamt, 87 );
+                return ret;
+            }( ) );
+    return ret;
 }
 
 BOOST_TEST_DONT_PRINT_LOG_VALUE( std::list< location > );
 BOOST_AUTO_TEST_CASE( BFS_TEST )
 {
-    auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp ){ return pp.second.first; };
+    auto sf =
+                []( const std::pair< location, std::pair< location, size_t > > & pp )
+                { return pp.second.first; };
     std::list< location > res;
     breadth_first_search< location >(
         Sibiu,
@@ -78,73 +80,79 @@ BOOST_AUTO_TEST_CASE( BFS_TEST )
 
 BOOST_AUTO_TEST_CASE( UCS_TEST )
 {
-	auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp ){ return pp.second; };
-	std::list< location > res;
-	recursive_uniform_cost_search(
-			Sibiu,
-			0,
-			10000,
-			[&]( location l, auto it )
-			{
-				auto tem = map( ).equal_range( l );
-				std::copy( boost::make_transform_iterator( tem.first, sf ), boost::make_transform_iterator( tem.second, sf ), it );
-			},
-			[](location l){ return l == Bucharest; },
-			[]( auto cost ){ BOOST_CHECK_EQUAL( cost, 278 ); },
-			std::back_inserter( res ) );
-	BOOST_CHECK_EQUAL( res, std::list< location >( { Sibiu, Rimnicu_Vilcea, Pitesti, Bucharest } ) );
+    auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp ){ return pp.second; };
+    std::list< location > res;
+    recursive_uniform_cost_search(
+            Sibiu,
+            0,
+            10000,
+            [&]( location l, auto it )
+            {
+                auto tem = map( ).equal_range( l );
+                std::copy(
+                    boost::make_transform_iterator( tem.first, sf ),
+                    boost::make_transform_iterator( tem.second, sf ),
+                    it );
+            },
+            [](location l){ return l == Bucharest; },
+            []( auto cost ){ BOOST_CHECK_EQUAL( cost, 278 ); },
+            std::back_inserter( res ) );
+    BOOST_CHECK_EQUAL( res, std::list< location >( { Sibiu, Rimnicu_Vilcea, Pitesti, Bucharest } ) );
 }
 
 BOOST_AUTO_TEST_CASE( DFS )
 {
-	auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp ){ return pp.second.first; };
-	std::list< location > res;
-	depth_first_search( Sibiu,
-			[&](location l, const auto & it)
-			{
-				auto tem = map( ).equal_range( l );
-				std::copy(
-					boost::make_transform_iterator( tem.first, sf ),
-					boost::make_transform_iterator( tem.second, sf ),
-					it );
-			},
-			[](location, location ret){return ret;},
-			[](location l){ return l == Bucharest; },
-			std::back_inserter( res ) );
-	BOOST_CHECK_EQUAL( res.back( ), Bucharest );
+    auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp )
+    { return pp.second.first; };
+    std::list< location > res;
+    depth_first_search( Sibiu,
+            [&](location l, const auto & it)
+            {
+                auto tem = map( ).equal_range( l );
+                std::copy(
+                    boost::make_transform_iterator( tem.first, sf ),
+                    boost::make_transform_iterator( tem.second, sf ),
+                    it );
+            },
+            [](location, location ret){return ret;},
+            [](location l){ return l == Bucharest; },
+            std::back_inserter( res ) );
+    BOOST_CHECK_EQUAL( res.back( ), Bucharest );
 }
 
 BOOST_AUTO_TEST_CASE( IDDFS )
 {
-	auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp ){ return pp.second.first; };
-	std::list< location > res;
-	iterative_deepening_depth_first_search(
-			Sibiu,
-			[&](location l, const auto & it)
-			{
-				auto tem = map( ).equal_range( l );
-				std::copy(
-					boost::make_transform_iterator( tem.first, sf ),
-					boost::make_transform_iterator( tem.second, sf ),
-					it );
-			},
-			[](location, location ret){ return ret; },
-			[](location l){ return l == Bucharest; },
-			std::back_inserter( res ) );
-	BOOST_CHECK_EQUAL( res, std::list< location >( { Fagaras, Bucharest } ) );
+    auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp )
+    { return pp.second.first; };
+    std::list< location > res;
+    iterative_deepening_depth_first_search(
+            Sibiu,
+            [&](location l, const auto & it)
+            {
+                auto tem = map( ).equal_range( l );
+                std::copy(
+                    boost::make_transform_iterator( tem.first, sf ),
+                    boost::make_transform_iterator( tem.second, sf ),
+                    it );
+            },
+            [](location, location ret){ return ret; },
+            [](location l){ return l == Bucharest; },
+            std::back_inserter( res ) );
+    BOOST_CHECK_EQUAL( res, std::list< location >( { Fagaras, Bucharest } ) );
 }
 
 BOOST_AUTO_TEST_CASE( BBFS )
 {
-	auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp ){ return pp.second.first; };
-	auto expand = [&]( location l, const auto & it )
-	{
-		auto tem = map( ).equal_range( l );
-		std::copy(
-					boost::make_transform_iterator( tem.first, sf ),
-					boost::make_transform_iterator( tem.second, sf ),
-					it );
-	};
+    auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp )
+    { return pp.second.first; };
+    auto expand = [&]( location l, const auto & it )
+    {
+        auto tem = map( ).equal_range( l );
+        std::copy(
+                    boost::make_transform_iterator( tem.first, sf ),
+                    boost::make_transform_iterator( tem.second, sf ),
+                    it );
+    };
     std::list< location > res, rev;
     biderectional_breadth_first_search< location, location >(
         Lugoj,
@@ -160,11 +168,16 @@ BOOST_AUTO_TEST_CASE( BBFS )
 }
 struct vacum_world
 {
-	bool is_left = true;
-	bool left_clean = false;
-	bool right_clean = false;
-	vacum_world( bool i, bool l, bool r ) : is_left( i ), left_clean( l ), right_clean( r ) { }
-	bool operator < ( const vacum_world & comp ) const { return std::tie( is_left, left_clean, right_clean ) < std::tie( comp.is_left, comp.left_clean, comp.right_clean ); }
+    bool is_left = true;
+    bool left_clean = false;
+    bool right_clean = false;
+    vacum_world( bool i, bool l, bool r ) : is_left( i ), left_clean( l ), right_clean( r ) { }
+    bool operator < ( const vacum_world & comp ) const
+    {
+        return
+            std::tie( is_left, left_clean, right_clean ) <
+            std::tie( comp.is_left, comp.left_clean, comp.right_clean );
+    }
 };
 enum class vacum_action { left, right, suck };
 typedef std::map< vacum_world, vacum_action > ignore1;
@@ -297,7 +310,17 @@ BOOST_AUTO_TEST_CASE( CSP )
             }
         }
         backtracking_search(
-                std::map< var, std::list< size_t > >( { {F, digits},{O, digits},{U, digits},{R, digits},{T, digits},{W, digits},{C1, carry},{C2, carry},{C3, carry} } ),
+                std::map< var, std::list< size_t > >(
+                {
+                    {F, digits},
+                    {O, digits},
+                    {U, digits},
+                    {R, digits},
+                    {T, digits},
+                    {W, digits},
+                    {C1, carry},
+                    {C2, carry},
+                    {C3, carry} } ),
                 4,
                 con,
                 std::back_inserter( result ) );
@@ -319,7 +342,8 @@ BOOST_AUTO_TEST_CASE( CSP )
                     con.push_back( make_local_constraint< size_t, var >
                     (
                         { s, l, r },
-                        [=]( const std::vector< std::reference_wrapper< const var > > & vec ){ return vec[0] != v || vec[1] == vec[2]; } )
+                        [=]( const std::vector< std::reference_wrapper< const var > > & vec )
+                        { return vec[0] != v || vec[1] == vec[2]; } )
                     );
                 };
         auto make_constrain_2 = [&]( var a, var b )
@@ -327,7 +351,8 @@ BOOST_AUTO_TEST_CASE( CSP )
             con.push_back( make_local_constraint< size_t, var >
             (
                 { 2, 5 },
-                [=]( const std::vector< std::reference_wrapper< const var > > & vec ){ return vec[0] != a || vec[1] == b; }
+                [=]( const std::vector< std::reference_wrapper< const var > > & vec )
+                { return vec[0] != a || vec[1] == b; }
             ) );
         };
         make_constrain_2( A, C );
@@ -501,7 +526,12 @@ BOOST_AUTO_TEST_CASE( ISSUE_2 )
 
 BOOST_AUTO_TEST_CASE( INFERENCE_AGENT )
 {
-    wumpus_world< 4, 4 > ww( coordinate( 0, 0 ), east, coordinate( 2, 0 ), coordinate( 2, 1 ), { coordinate( 0, 2 ), coordinate( 2, 2 ), coordinate( 3, 3 ) } );
+    wumpus_world< 4, 4 > ww(
+        coordinate( 0, 0 ),
+        east,
+        coordinate( 2, 0 ),
+        coordinate( 2, 1 ),
+        { coordinate( 0, 2 ), coordinate( 2, 2 ), coordinate( 3, 3 ) } );
     wumpus_agent< 4, 4 > agent( ww );
     int score = 0;
     while ( ! ww.is_end( ) )
