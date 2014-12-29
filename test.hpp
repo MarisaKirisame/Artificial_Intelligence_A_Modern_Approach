@@ -145,9 +145,18 @@ BOOST_AUTO_TEST_CASE( BBFS )
 					boost::make_transform_iterator( tem.second, sf ),
 					it );
 	};
-	std::list< location > res;
-	biderectional_breadth_first_search( Lugoj, Fagaras, expand, expand, std::back_inserter( res ) );
-	BOOST_CHECK_EQUAL( res, std::list< location >( { Lugoj, Timisoara, Arad, Sibiu, Fagaras } ) );
+    std::list< location > res, rev;
+    biderectional_breadth_first_search< location, location >(
+        Lugoj,
+        Fagaras,
+        expand,
+        []( location, location s ) { return s; },
+        std::back_inserter( res ),
+        expand,
+        []( location, location s ) { return s; },
+        std::back_inserter( rev ) );
+    std::copy( rev.rbegin( ), rev.rend( ), std::back_insert_iterator< decltype( res ) >( res ) );
+    BOOST_CHECK_EQUAL( res, std::list< location >( { Timisoara, Arad, Arad, Sibiu } ) );
 }
 struct vacum_world
 {
