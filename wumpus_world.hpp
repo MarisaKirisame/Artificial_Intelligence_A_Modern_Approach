@@ -305,7 +305,8 @@ namespace AI
                             else
                             {
                                 assert( act == world::action::move_forward );
-                                if ( allow_enter( s.first ) ) { s.first = next_square< x, y >( s.first, s.second ); }
+                                if ( allow_enter( s.first ) )
+                                { s.first = next_square< x, y >( s.first, s.second ); }
                             }
                             return s;
                         };
@@ -316,8 +317,12 @@ namespace AI
                     const coordinate & dest )
                 {
                     return
-                        std::abs( static_cast< int >( source.first.first ) - static_cast< int >( dest.first ) ) +
-                        std::abs( static_cast< int >( source.first.second ) - static_cast< int >( dest.second ) );
+                        std::abs(
+                            static_cast< int >( source.first.first ) -
+                            static_cast< int >( dest.first ) ) +
+                        std::abs(
+                            static_cast< int >( source.first.second ) -
+                            static_cast< int >( dest.second ) );
                 };
             std::pair< coordinate, direction > path_finder( env.agent.position, env.agent.facing );
             auto look_for_exit =
@@ -328,7 +333,8 @@ namespace AI
                             static_cast< size_t >( 0 ),
                             all_action,
                             next_state( [&]( const coordinate & c ) { return safe.count( c ) != 0; } ),
-                            [&]( const decltype( path_finder ) & pf ) { return eval_distance( pf, env.exit( ) ); },
+                            [&]( const decltype( path_finder ) & pf )
+                            { return eval_distance( pf, env.exit( ) ); },
                             [&]( const decltype( path_finder ) & pf )
                             { return safe.count( pf.first ) != 0 && pf.first == env.exit( ); },
                             [](const size_t &){}, std::back_inserter( plan ) );

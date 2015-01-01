@@ -11,6 +11,7 @@
 #include "scope.hpp"
 #include <functional>
 #include <memory>
+#include "../misc/combinator.hpp"
 namespace AI
 {
     template< typename VARIABLE_ID_T, typename VARIABLE_T >
@@ -116,36 +117,34 @@ namespace AI
                                         }( ) )
                                 {
                                     bool need_var = false;
-                                    auto generate =
-                                    [&](
-                                        const auto & self,
-                                        std::vector< std::reference_wrapper< const VARIABLE_T > > & arg )
-                                    {
-                                        if ( need_var ) { return; }
-                                        if ( arg.size( ) == parameters.size( ) )
-                                        { if ( con.predicate( arg ) == true ) { need_var = true; } }
-                                        else if ( arg.size( ) == shrink_position )
+                                    std::vector< std::reference_wrapper< const VARIABLE_T > > arg;
+                                    misc::fix(
+                                        [&]( const auto & self )
                                         {
-                                            arg.push_back( * it );
-                                            self( self, arg );
-                                            arg.pop_back( );
-                                        }
-                                        else
-                                        {
-                                            assert( arg.size( ) != shrink_position );
-                                            if ( parameters[ arg.size( ) ].get( ).empty( ) )
-                                            { need_var = true; }
-                                            for ( const VARIABLE_T & i : parameters[ arg.size( ) ].get( ) )
+                                            if ( need_var ) { return; }
+                                            if ( arg.size( ) == parameters.size( ) )
+                                            { if ( con.predicate( arg ) == true ) { need_var = true; } }
+                                            else if ( arg.size( ) == shrink_position )
                                             {
-                                                arg.push_back( i );
-                                                self( self, arg );
+                                                arg.push_back( * it );
+                                                self( );
                                                 arg.pop_back( );
-                                                if ( need_var ) { return; }
                                             }
-                                        }
-                                    };
-                                std::vector< std::reference_wrapper< const VARIABLE_T > > arg;
-                                generate( generate, arg );
+                                            else
+                                            {
+                                                assert( arg.size( ) != shrink_position );
+                                                if ( parameters[ arg.size( ) ].get( ).empty( ) )
+                                                { need_var = true; }
+                                                for ( const VARIABLE_T & i :
+                                                      parameters[ arg.size( ) ].get( ) )
+                                                {
+                                                    arg.push_back( i );
+                                                    self( );
+                                                    arg.pop_back( );
+                                                    if ( need_var ) { return; }
+                                                }
+                                            }
+                                        } )( );
                                 if ( need_var == false )
                                 {
                                     modify_variable.insert( con.related_var[ shrink_position ] );

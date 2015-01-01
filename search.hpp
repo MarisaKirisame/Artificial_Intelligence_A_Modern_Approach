@@ -19,6 +19,7 @@
 #include <random>
 #include <tuple>
 #include "scope.hpp"
+#include "../misc/combinator.hpp"
 namespace AI
 {
     template
@@ -544,13 +545,19 @@ namespace AI
         bool break_loop = false;
         while ( ! break_loop )
         {
-            depth_first_search( inital_state, i, f1, f2, f3, boost::make_function_output_iterator(
-                        [&]( const STATE & s )
-                        {
-                            break_loop = true;
-                            * result = s;
-                            ++result;
-                        } ) );
+            depth_first_search(
+                inital_state,
+                i,
+                f1,
+                f2,
+                f3,
+                boost::make_function_output_iterator(
+                    [&]( const STATE & s )
+                    {
+                        break_loop = true;
+                        * result = s;
+                        ++result;
+                    } ) );
             ++i;
         }
         return result;
@@ -1181,7 +1188,7 @@ namespace AI
             bool maximize;
             std::vector< std::shared_ptr< tree > > childs;
         };
-        auto explore =
+        auto explore = misc::fix(
             [&]( auto & self, const tree & t )
             {
                 if ( t.exploration_completed ) { return; }
@@ -1216,7 +1223,7 @@ namespace AI
                         std::shared_ptr< tree > & p = * it;
                         if ( t.maximize ? p->bound.first < current_bound : p->bound.second > current_bound )
                         { it = t.childs.erase( it ); }
-                        self( self, * p );
+                        self( * p );
                     }
                 }
                 t.exploration_completed =
@@ -1244,7 +1251,7 @@ namespace AI
                     t.maximize ?
                     std::max_element( t.childs.begin( ), t.hilds.end( ), eval_comp ) :
                     std::min_element( t.childs.begin( ), t.childs.end( ), eval_comp );
-            };
+            } );
         auto res = f3( inital_state );
         tree root(
         {

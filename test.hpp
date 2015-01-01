@@ -232,8 +232,9 @@ BOOST_AUTO_TEST_CASE( AOS )
                 possibility );
     BOOST_CHECK( res );
     table_driven_agent< vacum_world, vacum_action > cleaner( * res );
-    auto test =
-        [&](const auto & self,const vacum_world & v, std::set< vacum_world > & history)
+    std::set< vacum_world > history;
+    auto test = misc::fix(
+        [&]( auto & self, const vacum_world & v ) -> bool
         {
             if ( cleaned( v ) ) { return true; }
             auto act = cleaner( v );
@@ -247,13 +248,12 @@ BOOST_AUTO_TEST_CASE( AOS )
                 if ( history.count( vw ) != 0 ) { continue; }
                 history.insert( vw );
                 dead_end = false;
-                if ( ! self( self, vw, history ) ) { return false; }
+                if ( ! self( vw ) ) { return false; }
                 history.erase( vw );
             }
             return ! dead_end;
-        };
-    std::set< vacum_world > h;
-    BOOST_CHECK( test( test, vacum_world( false, false, false ), h ) );
+        } );
+    BOOST_CHECK( test( vacum_world( false, false, false ) ) );
 }
 
 BOOST_AUTO_TEST_CASE( CSP )
