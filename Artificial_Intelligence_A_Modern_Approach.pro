@@ -5,7 +5,6 @@ CONFIG -= qt
 LIBS += -lboost_unit_test_framework
 QMAKE_CXXFLAGS += -std=c++1z
 SOURCES += main.cpp
-
 HEADERS += \
     agent.hpp \
     search.hpp \

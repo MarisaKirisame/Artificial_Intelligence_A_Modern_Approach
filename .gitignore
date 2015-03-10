@@ -1,7 +1,6 @@
 .directory
 *.autosave
 *.pro.user
-main.cpp
 # Compiled Object files
 *.slo
 *.lo

@@ -62,9 +62,11 @@ namespace AI
             auto mit = modify_variable.begin( );
             assert( mit != modify_variable.end( ) );
             auto pit = partial_assignment.find( * mit );
-            assert( pit != partial_assignment.end( ) );
-            auto vit = variable.find( * mit );
-            vit->second.first = { pit->second };
+            if( pit != partial_assignment.end( ) )
+            {
+                auto vit = variable.find( * mit );
+                vit->second.first = { pit->second };
+            }
         }
         if (
             std::any_of(
@@ -209,7 +211,7 @@ namespace AI
                             if ( std::count(
                                     assigned_neighbor_value[i].begin( ),
                                     assigned_neighbor_value[i].end( ),
-                                    ass[i] ) == 0 )
+                                    ass[i].get( ) ) == 0 )
                             { return true; }
                         }
                         return false;
