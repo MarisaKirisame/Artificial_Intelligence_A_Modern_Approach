@@ -9,8 +9,6 @@ HEADERS += \
     agent.hpp \
     search.hpp \
     test.hpp \
-    CSP.hpp \
-    wumpus_world.hpp \
-    scope.hpp
+    wumpus_world.hpp
 
 PRECOMPILED_HEADER = $$HEADERS

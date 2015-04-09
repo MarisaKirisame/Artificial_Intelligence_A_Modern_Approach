@@ -6,14 +6,16 @@
 #include <utility>
 #include <vector>
 #include <algorithm>
-#include "../propositional_calculus_prover/CNF.hpp"
-#include  "../propositional_calculus_prover/proposition.hpp"
+#include "../first_order_logic_prover/resolution.hpp"
+#include  "../first_order_logic_prover/sentence.hpp"
 #include <boost/function_output_iterator.hpp>
 #include <boost/optional/optional.hpp>
 #include "search.hpp"
-#include "../propositional_calculus_prover/DPLL.hpp"
+#include "../first_order_logic_prover/DPLL.hpp"
+#include "../first_order_logic_prover/first_order_logic.hpp"
 namespace AI
 {
+    using namespace first_order_logic;
     enum direction { north, east, south, west };
     typedef std::pair< size_t, size_t > coordinate;
     direction left( direction d )
@@ -190,34 +192,32 @@ namespace AI
 
     struct knoweldge_base
     {
-        typedef propositional_calculus::proposition proposition;
-        typedef propositional_calculus::CNF CNF;
-        propositional_calculus::CNF data;
-        void insert( const propositional_calculus::clause & c )
+        typedef first_order_logic::free_propositional_sentence proposition;
+        typedef std::set< std::set< first_order_logic::literal > > CNF;
+        CNF data;
+        void insert( const std::set< first_order_logic::literal > & c )
         {
-            data.data.insert( c );
-            assert( propositional_calculus::DPLL( data ) );
+            data.insert( c );
         }
-        void insert( const propositional_calculus::proposition & p )
+        void insert( const proposition & p )
         {
-            CNF cnf( propositional_calculus::to_CNF( p ) );
-            std::copy( cnf.data.begin( ), cnf.data.end( ), std::inserter( data.data, data.data.begin( ) ) );
-            assert( propositional_calculus::DPLL( data ) );
+            CNF cnf( first_order_logic::set_set_literal( p ) );
+            std::copy( cnf.begin( ), cnf.end( ), std::inserter( data, data.begin( ) ) );
         }
         bool certain( const proposition & p )
         {
-            CNF cnf( propositional_calculus::to_CNF( propositional_calculus::make_not( p ) ) );
-            for ( auto it = cnf.data.begin( ); it != cnf.data.end( ); )
+            CNF cnf( first_order_logic::set_set_literal( first_order_logic::make_not( p ) ) );
+            for ( auto it = cnf.begin( ); it != cnf.end( ); )
             {
-                auto ret = data.data.insert( * it );
-                if ( ! ret.second ) { it = cnf.data.erase( it ); }
+                auto ret = data.insert( * it );
+                if ( ! ret.second ) { it = cnf.erase( it ); }
                 else { ++it; }
             }
-            bool ret = propositional_calculus::DPLL( data );
-            for ( const propositional_calculus::clause & c : cnf.data ) { data.data.erase( c ); }
+            bool ret = is_satisfiable( first_order_logic::DPLL( first_order_logic::set_set_to_list_list( data ) ) );
+            for ( const auto & c : cnf ) { data.erase( c ); }
             return ! ret;
         }
-        bool possible( const proposition & p ) { return ! certain( propositional_calculus::make_not( p ) ); }
+        bool possible( const proposition & p ) { return ! certain( first_order_logic::make_not( p ) ); }
         knoweldge_base( ) : data( { } ) { }
     };
 
@@ -227,7 +227,7 @@ namespace AI
         typedef wumpus_world< x, y > world;
         knoweldge_base kb;
         const world & env;
-        typedef propositional_calculus::proposition proposition;
+        typedef first_order_logic::free_propositional_sentence proposition;
         typedef typename world::action action;
         std::set< coordinate > un_visited;
         std::list< action > plan;
@@ -240,7 +240,7 @@ namespace AI
             {
                 clause tem;
                 env.surronding_squares( boost::make_function_output_iterator(
-                    [&]( const coordinate & c ) { tem.data.insert( literal( pit( c ), true ) ); } ) );
+                    [&]( const coordinate & c ) { tem.insert( literal( pit( c ), true ) ); } ) );
                 kb.insert( tem );
             }
             else { env.surronding_squares( boost::make_function_output_iterator(
@@ -251,7 +251,7 @@ namespace AI
                 {
                     clause tem;
                     env.surronding_squares( boost::make_function_output_iterator(
-                        [&]( const coordinate & c ){ tem.data.insert( literal( wumpus( c ), true ) ); } ) );
+                        [&]( const coordinate & c ){ tem.insert( literal( wumpus( c ), true ) ); } ) );
                     kb.insert( tem );
                 }
                 else
@@ -268,9 +268,9 @@ namespace AI
                 {
                     proposition safe_square =
                         env.wumpus_killed ?
-                            propositional_calculus::make_not( pit( coordinate( i, j ) ) ) :
-                            propositional_calculus::make_not(
-                                propositional_calculus::make_or(
+                            first_order_logic::make_not( pit( coordinate( i, j ) ) ) :
+                            first_order_logic::make_not(
+                                first_order_logic::make_or(
                                     wumpus( coordinate( i, j ) ),
                                     pit( coordinate( i, j ) ) ) );
                     if ( kb.certain( safe_square ) )
@@ -423,12 +423,12 @@ namespace AI
             plan.pop_front( );
             return ret;
         }
-        typedef propositional_calculus::clause clause;
-        typedef propositional_calculus::literal literal;
+        typedef first_order_logic::literal literal;
+        typedef std::set< literal > clause;
         std::string square( const coordinate & c ) const
         { return std::to_string( c.first ) + "," + std::to_string( c.second ); }
-        std::string pit( const coordinate & c ) const { return "P" + square( c ); }
-        std::string wumpus( const coordinate & c ) const { return "W" + square( c ); }
+        first_order_logic::atomic_sentence pit( const coordinate & c ) const { return first_order_logic::make_propositional_letter( "P" + square( c ) ); }
+        first_order_logic::atomic_sentence wumpus( const coordinate & c ) const { return first_order_logic::make_propositional_letter( "W" + square( c ) ); }
         wumpus_agent( const world & w ) : env( w )
         {
             assert( w.is_end( ) == false );

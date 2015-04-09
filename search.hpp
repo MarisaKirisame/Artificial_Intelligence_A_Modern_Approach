@@ -18,8 +18,8 @@
 #include <boost/iterator/transform_iterator.hpp>
 #include <random>
 #include <tuple>
-#include "scope.hpp"
-#include "../misc/combinator.hpp"
+#include "../cpp_common/scope.hpp"
+#include "../cpp_common/combinator.hpp"
 namespace AI
 {
     template
@@ -1188,7 +1188,7 @@ namespace AI
             bool maximize;
             std::vector< std::shared_ptr< tree > > childs;
         };
-        auto explore = misc::fix(
+        auto explore = common::fix(
             [&]( auto & self, const tree & t )
             {
                 if ( t.exploration_completed ) { return; }
