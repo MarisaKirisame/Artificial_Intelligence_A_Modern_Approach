@@ -213,7 +213,7 @@ namespace AI
                 if ( ! ret.second ) { it = cnf.erase( it ); }
                 else { ++it; }
             }
-            bool ret = is_satisfiable( first_order_logic::DPLL( first_order_logic::set_set_to_list_list( data ) ) );
+            bool ret = is_satisfiable( first_order_logic::DPLL( first_order_logic::set_set_to_list_list( data ) ) ).get( );
             for ( const auto & c : cnf ) { data.erase( c ); }
             return ! ret;
         }
