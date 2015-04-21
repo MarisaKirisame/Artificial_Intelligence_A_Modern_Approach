@@ -154,7 +154,7 @@ namespace AI
                 f1,
                 f2,
                 f3,
-                [](const STATE &, const COST & s){return s;},\
+                [](const STATE &, const COST & s){return s;},
                 f4,
                 result );
     }
