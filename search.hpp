@@ -374,60 +374,22 @@ namespace AI
     struct postive_infinity
     {
         bool operator == ( const postive_infinity & ) { return true; }
-        template< typename T >
-        bool operator == ( const T & ) const { return false; }
-        template< typename T >
-        bool operator != ( const T & t ) const { return ! ( ( * this ) == t ); }
-        template< typename T >
-        bool operator < ( const T & ) const { return false; }
-        template< typename T >
-        bool operator >= ( const T & ) const { return true; }
-        template< typename T >
-        bool operator <= ( const T & t ) const { return ( * this ) == t; }
-        template< typename T >
-        bool operator > ( const T & t ) const { return ( * this ) != t; }
-        template< typename T >
-        postive_infinity operator + ( const T & ) const { return * this; }
-        template< typename T >
-        postive_infinity operator - ( const T & ) const { return * this; }
+        template< typename T > bool operator == ( const T & ) const { return false; }
+        template< typename T > bool operator != ( const T & t ) const { return ! ( ( * this ) == t ); }
+        template< typename T > bool operator < ( const T & ) const { return false; }
+        template< typename T > bool operator >= ( const T & ) const { return true; }
+        template< typename T > bool operator <= ( const T & t ) const { return ( * this ) == t; }
+        template< typename T > bool operator > ( const T & t ) const { return ( * this ) != t; }
+        template< typename T > postive_infinity operator + ( const T & ) const { return * this; }
+        template< typename T > postive_infinity operator - ( const T & ) const { return * this; }
         postive_infinity operator - ( const postive_infinity & ) const = delete;
-        template< typename T >
-        postive_infinity operator * ( const T & t ) const
-        {
-            assert( t > 0 );
-            return * this;
-        }
-        template< typename T >
-        postive_infinity operator / ( const T & t ) const
-        {
-            assert( t > 0 );
-            return * this;
-        }
-        template< typename T >
-        postive_infinity & operator += ( const T & t )
-        {
-            ( * this ) = ( * this ) + t;
-            return * this;
-        }
-        template< typename T >
-        postive_infinity & operator -= ( const T & t )
-        {
-            ( * this ) = ( * this ) - t;
-            return * this;
-        }
-        template< typename T >
-        postive_infinity & operator *= ( const T & t )
-        {
-            ( * this ) = ( * this ) * t;
-            return * this;
-        }
-        template< typename T >
-        postive_infinity & operator /= ( const T & t )
-        {
-            ( * this ) = ( * this ) / t;
-            return * this;
-        }
-    };
+        template< typename T > postive_infinity operator * ( const T & t ) const { assert( t > 0 ); return * this; }
+        template< typename T > postive_infinity operator / ( const T & t ) const { assert( t > 0 ); return * this; }
+        template< typename T > postive_infinity & operator += ( const T & t ) { ( * this ) = ( * this ) + t; return * this; }
+        template< typename T > postive_infinity & operator -= ( const T & t ) { ( * this ) = ( * this ) - t; return * this; }
+        template< typename T > postive_infinity & operator *= ( const T & t ) { ( * this ) = ( * this ) * t; return * this; }
+        template< typename T > postive_infinity & operator /= ( const T & t ) { ( * this ) = ( * this ) / t; return * this; }
+    }; //Move to cpp_common. Add Negative Infinity. Add wrapper with numeral class. Remove biolerplate code by using boost
 
     template
     <
@@ -1127,7 +1089,7 @@ namespace AI
         return or_test( or_test, inital_state, history );
     }
 
-    template< typename STATE, typename NEXT_STATE, typename IS_END, typename EVAL_FUNC >
+    template< typename STATE, typename ACTION, typename NEXT_STATE, typename IS_END, typename EVAL_FUNC >
     auto minmax_search(
             const STATE & inital_state,
             bool maximize,
@@ -1135,8 +1097,8 @@ namespace AI
             IS_END f2,
             EVAL_FUNC f3 )
     {
-        typedef decltype( f4( inital_state ) ) EVAL;
-        if ( f3( inital_state ) ) { return f4( inital_state ); }
+        typedef decltype( f3( inital_state ) ) EVAL;
+        if ( f2( inital_state ) ) { return f3( inital_state ); }
         std::vector< std::pair< STATE, EVAL > > vec;
         f1(
             inital_state,
