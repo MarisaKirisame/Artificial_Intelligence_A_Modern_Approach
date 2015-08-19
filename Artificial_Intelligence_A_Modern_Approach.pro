@@ -10,5 +10,5 @@ HEADERS += \
     search.hpp \
     test.hpp \
     wumpus_world.hpp
-
+INCLUDEPATH += ../
 PRECOMPILED_HEADER = $$HEADERS

@@ -389,7 +389,7 @@ namespace AI
         template< typename T > postive_infinity & operator -= ( const T & t ) { ( * this ) = ( * this ) - t; return * this; }
         template< typename T > postive_infinity & operator *= ( const T & t ) { ( * this ) = ( * this ) * t; return * this; }
         template< typename T > postive_infinity & operator /= ( const T & t ) { ( * this ) = ( * this ) / t; return * this; }
-    }; //Move to cpp_common. Add Negative Infinity. Add wrapper with numeral class. Remove biolerplate code by using boost
+    };
 
     template
     <

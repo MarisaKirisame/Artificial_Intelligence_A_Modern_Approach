@@ -6,13 +6,10 @@
 #include <utility>
 #include <vector>
 #include <algorithm>
-#include "../first_order_logic_prover/resolution.hpp"
-#include  "../first_order_logic_prover/sentence.hpp"
 #include <boost/function_output_iterator.hpp>
 #include <boost/optional/optional.hpp>
 #include "search.hpp"
-#include "../first_order_logic_prover/DPLL.hpp"
-#include "../first_order_logic_prover/first_order_logic.hpp"
+#include "first_order_logic_prover/first_order_logic.hpp"
 namespace AI
 {
     using namespace first_order_logic;
