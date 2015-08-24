@@ -7,9 +7,10 @@
 #include <vector>
 #include <algorithm>
 #include <boost/function_output_iterator.hpp>
-#include <boost/optional/optional.hpp>
 #include "search.hpp"
-#include "first_order_logic_prover/first_order_logic.hpp"
+#include "first_order_logic.hpp"
+#include "sentence/CNF.hpp"
+#include "SAT/DPLL.hpp"
 namespace AI
 {
     using namespace first_order_logic;
@@ -210,7 +211,7 @@ namespace AI
                 if ( ! ret.second ) { it = cnf.erase( it ); }
                 else { ++it; }
             }
-            bool ret = is_satisfiable( first_order_logic::DPLL( first_order_logic::set_set_to_list_list( data ) ) ).get( );
+            bool ret = is_satisfiable( first_order_logic::DPLL( first_order_logic::set_set_to_list_list( data ) ) ).value( );
             for ( const auto & c : cnf ) { data.erase( c ); }
             return ! ret;
         }
