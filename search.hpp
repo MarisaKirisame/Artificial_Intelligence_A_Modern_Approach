@@ -1041,7 +1041,7 @@ namespace AI
             ALL_ACTION f2,
             POSSIBLE_STATE f3 )
     {
-        if ( f1( inital_state ) ) { return boost::optional< std::map< STATE, ACTION > >( { } ); }
+        if ( f1( inital_state ) ) { return std::map< STATE, ACTION >( { } ); }
         const boost::optional< std::map< STATE, ACTION > > faliure;
         auto and_test = [&]( const auto & or_t, const std::vector< STATE > & vec, std::set< STATE > & history )
         {
