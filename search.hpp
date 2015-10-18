@@ -178,9 +178,9 @@ namespace AI
                 {
                     f1( s,
                         boost::make_function_output_iterator(
-                            [&]( const STATE & s )
+                            [&]( const ACTION_TYPE & act )
                             {
-                                *it = std::make_pair(s,1);
+                                *it = std::make_pair(act,1);
                                 ++it;
                             } ) );
                 },
