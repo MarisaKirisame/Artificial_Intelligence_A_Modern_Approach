@@ -513,7 +513,7 @@ namespace AI
                 f2,
                 f3,
                 boost::make_function_output_iterator(
-                    [&]( const STATE & s )
+                    [&]( const ACTION & s )
                     {
                         break_loop = true;
                         * result = s;
