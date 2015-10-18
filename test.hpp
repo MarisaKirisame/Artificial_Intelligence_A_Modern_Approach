@@ -1,7 +1,7 @@
 #ifndef TEST_HPP
 #define TEST_HPP
 #define BOOST_TEST_MAIN
-#define BOOST_TEST_DYN_LINK
+#include <boost/test/included/unit_test.hpp>
 #include <boost/test/unit_test.hpp>
 #include <utility>
 #include <functional>
@@ -107,7 +107,7 @@ BOOST_AUTO_TEST_CASE( DFS )
         []( const std::pair< location, std::pair< location, size_t > > & pp )
         { return pp.second.first; };
     std::list< location > res;
-    depth_first_search(
+    depth_first_search< location >(
         Sibiu,
         [&](location l, const auto & it)
         {
@@ -129,7 +129,7 @@ BOOST_AUTO_TEST_CASE( IDDFS )
         []( const std::pair< location, std::pair< location, size_t > > & pp )
         { return pp.second.first; };
     std::list< location > res;
-    iterative_deepening_depth_first_search(
+    iterative_deepening_depth_first_search< location >(
         Sibiu,
         [&](location l, const auto & it)
         {

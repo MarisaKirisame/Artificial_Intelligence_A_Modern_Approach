@@ -393,6 +393,7 @@ namespace AI
 
     template
     <
+        typename ACTION,
         typename STATE,
         typename ALL_ACTION,
         typename NEXT_STATE,
@@ -405,10 +406,11 @@ namespace AI
             NEXT_STATE f2,
             RETURN_IF f3,
             OUTITER result )
-    { return depth_first_search( inital_state, postive_infinity( ), f1, f2, f3, result ); }
+    { return depth_first_search< ACTION >( inital_state, postive_infinity( ), f1, f2, f3, result ); }
 
     template
     <
+        typename ACTION,
         typename STATE,
         typename NUM,
         typename ALL_ACTION,
@@ -428,22 +430,16 @@ namespace AI
         if ( f3( inital_state ) ) { return result; }
         if ( depth < 1 ) { return result; }
         auto new_depth = depth - 1;
-        std::vector< std::pair< STATE, std::function< void ( ) > > > vec;
-        f1( inital_state, boost::make_function_output_iterator(
-                    [&](const auto & action)
-                    {
-                        vec.push_back(
-                        std::make_pair(
-                            f2( inital_state, action ),
-                            [action,&result](){ * result = action; ++result; } ) );
-                    } ) );
-        for ( const std::pair< STATE, std::function< void ( ) > > & s : vec )
+        std::vector< std::pair< STATE, ACTION > > vec;
+        f1( inital_state,
+            boost::make_function_output_iterator( [&](const auto & action) { vec.push_back( { f2( inital_state, action ), action } ); } ) );
+        for ( const std::pair< STATE, ACTION > & s : vec )
         {
-            if ( f3( s.first ) ) { s.second( ); return result; }
+            if ( f3( s.first ) ) { * result = s.second; return ++result; }
             if ( history.count( s.first ) != 0 ) { continue; }
             history.insert( s.first );
             bool find_solution = false;
-            depth_first_search(
+            depth_first_search< ACTION >(
                     s.first,
                     new_depth,
                     history,
@@ -452,11 +448,12 @@ namespace AI
                     f3,
                     boost::make_function_output_iterator(
                         std::function< void( const STATE & ) >(
-                            [&]( const auto & action )
+                            [&]( const ACTION & action )
                             {
                                 if ( ! find_solution )
                                 {
-                                    s.second( );
+                                    * result = s.second;
+                                    ++result;
                                     find_solution = true;
                                 }
                                 * result = action;
@@ -470,6 +467,7 @@ namespace AI
 
     template
     <
+        typename ACTION,
         typename STATE,
         typename NUM,
         typename ALL_ACTION,
@@ -486,11 +484,12 @@ namespace AI
             OUTITER result )
     {
         std::set< STATE > history = { inital_state };
-        return depth_first_search( inital_state, depth, history, f1, f2, f3, result );
+        return depth_first_search< ACTION >( inital_state, depth, history, f1, f2, f3, result );
     }
 
     template
     <
+        typename ACTION,
         typename STATE,
         typename ALL_ACTION,
         typename NEXT_STATE,
@@ -507,7 +506,7 @@ namespace AI
         bool break_loop = false;
         while ( ! break_loop )
         {
-            depth_first_search(
+            depth_first_search< ACTION >(
                 inital_state,
                 i,
                 f1,
