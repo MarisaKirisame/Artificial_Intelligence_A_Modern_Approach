@@ -447,7 +447,7 @@ namespace AI
                     f2,
                     f3,
                     boost::make_function_output_iterator(
-                        std::function< void( const STATE & ) >(
+                        std::function< void( const ACTION & ) >(
                             [&]( const ACTION & action )
                             {
                                 if ( ! find_solution )
