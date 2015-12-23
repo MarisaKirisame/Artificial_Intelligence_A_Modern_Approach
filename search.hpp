@@ -1088,31 +1088,28 @@ namespace AI
         return or_test( or_test, inital_state, history );
     }
 
-    template< typename STATE, typename ACTION, typename NEXT_STATE, typename IS_END, typename EVAL_FUNC >
+    template< typename ACTION, typename STATE, typename ALL_ACTION, typename MAKE_MOVE, typename IS_END, typename EVAL_FUNC >
     auto minmax_search(
             const STATE & inital_state,
             bool maximize,
-            NEXT_STATE f1,
-            IS_END f2,
-            EVAL_FUNC f3 )
+            ALL_ACTION all_action,
+            MAKE_MOVE make_move,
+            IS_END is_end,
+            EVAL_FUNC eval_func )
     {
-        typedef decltype( f3( inital_state ) ) EVAL;
-        if ( f2( inital_state ) ) { return f3( inital_state ); }
-        std::vector< std::pair< STATE, EVAL > > vec;
-        f1(
+        typedef decltype( eval_func( inital_state ) ) EVAL;
+        if ( is_end( inital_state ) ) { return eval_func( inital_state ); }
+        std::vector< std::pair< ACTION, EVAL > > vec;
+        all_action(
             inital_state,
             boost::make_function_output_iterator(
-                [&](const STATE & state)
+                [&](const ACTION & act)
                 { vec.push_back( std::make_pair(
-                    state,
-                    minmax_search( state, ! maximize, f1, f2, f3 ) ) ); } ) );
+                    act,
+                    minmax_search< ACTION >( make_move( state, act ), ! maximize, all_action, make_move, is_end, eval_func ).second ) ); } ) );
         assert( ! vec.empty( ) );
-        std::sort(
-            vec.begin( ),
-            vec.end( ),
-            []( const std::pair< STATE, EVAL > & l, const std::pair< STATE, EVAL > & r )
-            { return l.second < r.second; } );
-        return maximize ? vec.back( ).second : vec.front( ).second;
+        std::sort( vec.begin( ), vec.end( ), []( const auto & l, const auto & r ) { return l.second < r.second; } );
+        return maximize ? vec.back( ) : vec.front( );
     }
 
     template
