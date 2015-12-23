@@ -1089,7 +1089,7 @@ namespace AI
     }
 
     template< typename ACTION, typename STATE, typename ALL_ACTION, typename MAKE_MOVE, typename IS_END, typename EVAL_FUNC >
-    auto minmax_search(
+    auto minmax_search_score(
             const STATE & inital_state,
             bool maximize,
             ALL_ACTION all_action,
@@ -1106,7 +1106,30 @@ namespace AI
                 [&](const ACTION & act)
                 { vec.push_back( std::make_pair(
                     act,
-                    minmax_search< ACTION >( make_move( inital_state, act ), ! maximize, all_action, make_move, is_end, eval_func ).second ) ); } ) );
+                    minmax_search_score< ACTION >( make_move( inital_state, act ), !maximize, all_action, make_move, is_end, eval_func ) ) ); } ) );
+        assert( ! vec.empty( ) );
+        std::sort( vec.begin( ), vec.end( ), []( const auto & l, const auto & r ) { return l.second < r.second; } );
+        return maximize ? vec.back( ).second : vec.front( ).second;
+    }
+
+    template< typename ACTION, typename STATE, typename ALL_ACTION, typename MAKE_MOVE, typename IS_END, typename EVAL_FUNC >
+    auto minmax_search(
+            const STATE & inital_state,
+            bool maximize,
+            ALL_ACTION all_action,
+            MAKE_MOVE make_move,
+            IS_END is_end,
+            EVAL_FUNC eval_func )
+    {
+        typedef decltype( eval_func( inital_state ) ) EVAL;
+        std::vector< std::pair< ACTION, EVAL > > vec;
+        all_action(
+            inital_state,
+            boost::make_function_output_iterator(
+                [&](const ACTION & act)
+                { vec.push_back( std::make_pair(
+                    act,
+                    minmax_search_score< ACTION >( make_move( inital_state, act ), !maximize, all_action, make_move, is_end, eval_func ) ) ); } ) );
         assert( ! vec.empty( ) );
         std::sort( vec.begin( ), vec.end( ), []( const auto & l, const auto & r ) { return l.second < r.second; } );
         return maximize ? vec.back( ) : vec.front( );
