@@ -19,7 +19,7 @@
 #include <random>
 #include <tuple>
 #include "../cpp_common/scope.hpp"
-#include "../cpp_common/combinator.hpp"
+#include "../FunctionalCpp/combinator.hpp"
 namespace AI
 {
     template
@@ -1149,7 +1149,7 @@ namespace AI
             bool maximize;
             std::vector< std::shared_ptr< tree > > childs;
         };
-        auto explore = common::fix(
+        auto explore = FC::fix(
             [&]( auto & self, const tree & t )
             {
                 if ( t.exploration_completed ) { return; }

@@ -1,6 +1,7 @@
 #ifndef TEST_HPP
 #define TEST_HPP
 #define BOOST_TEST_MAIN
+#define BOOST_TEST_DYN_LINK
 #include <boost/test/unit_test.hpp>
 #include <utility>
 #include <functional>
@@ -231,7 +232,7 @@ BOOST_AUTO_TEST_CASE( AOS )
     BOOST_CHECK( res );
     table_driven_agent< vacum_world, vacum_action > cleaner( * res );
     std::set< vacum_world > history;
-    auto test = common::fix(
+    auto test = FC::fix(
         [&]( auto & self, const vacum_world & v ) -> bool
         {
             if ( cleaned( v ) ) { return true; }
